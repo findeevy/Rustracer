@@ -1,9 +1,11 @@
+#![allow(warnings)]
+
 use std::ops::{Add, Sub, Mul};
 use std::fs::File;
 use std::io::{self, Write};
 
 const HEIGHT: usize = 1000;
-iconst WIDTH: usize = 1000;
+const WIDTH: usize = 1000;
 
 #[derive(Debug, Copy, Clone)]
 struct Sphere{
@@ -14,24 +16,9 @@ struct Sphere{
 impl Sphere{
 
   fn new(transform: Vector3, radius: f32) -> Self {
-    Sphere {transform, f32}
+    Sphere {transform, radius}
   }
   
-  fn ray_interesect(orgin: Vector3, direction: Vector3, distance: Vector3) -> bool{
-    let length = self.transform - origin;
-    let ray = length * direction;
-    let difference_of_squares = length*length - ray*ray;
-    if (difference_of_squares > self.radius){
-      return false;
-    }
-    let temp = (self.radius*self.radius - difference_of_squares).sqrt();
-    let point0 = ray - difference_of_squares;
-    let point1 = ray + difference_of_sqaures;
-    if (point0 < 0){
-      point0 = point1;
-    }
-    return !(point0 < 0);
-  }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -124,6 +111,22 @@ fn udiv(x: usize, y: usize) -> f32{
     return (x as f32)/(y as f32);
 }
 
+fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, distance: f32) -> bool{
+  let length = sphere.transform - origin;
+  let ray = length * direction;
+  let difference_of_squares = length.dot(&length) - ray*ray;
+  if (difference_of_squares > sphere.radius){
+    return false;
+  }
+  let temp = (sphere.radius*sphere.radius - difference_of_squares).sqrt();
+  let point0 = ray - temp;
+  let point1 = ray + temp;
+  if (point0 < 0){
+    point0 = point1;
+  }
+  return !(point0 < 0);
+}
+
 //Write the framebuffer to a ppm file.
 fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -> io::Result<()>{
     //Open the PPM file.
@@ -149,7 +152,13 @@ fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -
     Ok(())
 }
 
-fn cast_ray()
+fn cast_ray(camera_position: Vector3, direction: Vector3, sphere: Sphere) -> Vector3{
+  let cast_bounds = 1000.0;
+  if (!ray_intersect(sphere, camera_position, direction, cast_bounds)){
+    return Vector3::new(0.3, 0.3, 0.9);
+  }
+  return Vector3::new(1.0, 0.0, 0.0);
+}
 
 fn render_test_gradient(){
   let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
@@ -167,13 +176,13 @@ fn render_test_gradient(){
 
 fn render(){
   let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
-  let fov: f32 = 90;
+  let fov: f32 = 90.0;
   let sphere = Sphere::new(Vector3::new(1.0, 1.0, 2.0), 1.0);
 
-  for y in 0...HEIGHT{
-    for x in 0...WIDTH{
-      let transform_x = (udiv((2*(i+0.5)), (WIDTH - 1)))*tan(fov/2.0)*udiv(WIDTH, HEIGHT);
-      let transform_y = (udiv((2*(i+0.5)), (WIDTH - 1)))*tan(fov/2.0);
+  for y in 0..HEIGHT{
+    for x in 0..WIDTH{
+      let transform_x = (udiv((2*(x + 0.5)), (WIDTH - 1)))*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
+      let transform_y = (udiv((2*(y + 0.5)), (WIDTH - 1)))*(fov/2.0).tan();
       let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
       framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, sphere);
     }
