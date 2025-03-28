@@ -4,7 +4,7 @@ use std::ops::{Add, Sub, Mul};
 use std::fs::File;
 use std::io::{self, Write};
 
-const HEIGHT: usize = 768;
+const HEIGHT: usize = 1024;
 const WIDTH: usize = 1024;
 
 #[derive(Debug, Copy, Clone)]
@@ -182,9 +182,8 @@ fn render(){
   let sphere = Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 2.0);
   for y in 0..HEIGHT{
     for x in 0..WIDTH{
-      let transform_x = (((x as f32 + 0.5))/(WIDTH as f32 - 1.0))*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
-      println!("{}", transform_x);
-      let transform_y = -1.0*(((y as f32 + 0.5))/(HEIGHT as f32 - 1.0))*(fov/2.0).tan();
+      let transform_x = (2.0*(x as f32 + 0.5)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
+      let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
       let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
       framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, sphere);
     }
