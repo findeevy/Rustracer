@@ -176,10 +176,9 @@ fn render_test_gradient(){
   let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &framebuffer);
 }
 
-fn render(){
+fn render(sphere: Sphere){
   let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
   let fov: f32 =  1.0;
-  let sphere = Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 2.0);
   for y in 0..HEIGHT{
     for x in 0..WIDTH{
       let transform_x = (2.0*(x as f32 + 0.5)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
@@ -193,5 +192,6 @@ fn render(){
 }
 
 fn main(){
-  render()
+  let sphere = Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 2.0);
+  render(sphere)
 }
