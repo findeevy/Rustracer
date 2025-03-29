@@ -125,7 +125,7 @@ fn udiv(x: usize, y: usize) -> f32{
     return (x as f32)/(y as f32);
 }
 
-fn ray_intersect(spheres: Vec, origin: Vector3, direction: Vector3, distance: f32) -> bool{
+fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, distance: f32) -> bool{
   let length = sphere.transform - origin;
   let ray = length.dot(&direction);
   //println!("{}", ray);
@@ -142,6 +142,22 @@ fn ray_intersect(spheres: Vec, origin: Vector3, direction: Vector3, distance: f3
   }
   return !(point0 < 0.0);
 }
+
+fn scene_intersect(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, mut hit: Vector3, mut N: Vector3, mut material: Material) -> bool{
+  let mut spheres_distance = f32::MAX;  
+  for i in 0..spheres.len() {
+    let mut dist_i: f32 = 0.0;
+    if (ray_intersect(spheres[i], origin, direction, dist_i) && dist_i < spheres_distance){
+      spheres_distance = dist_i;
+      hit = origin + direction*dist_i;
+      N = (hit-spheres[i].transform).normalize();
+      material = spheres[i].material;
+    }
+  }
+  return spheres_distance < 1000.0;
+}
+
+
 
 //Write the framebuffer to a ppm file.
 fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -> io::Result<()>{
@@ -168,12 +184,15 @@ fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -
     Ok(())
 }
 
-fn cast_ray(camera_position: Vector3, direction: Vector3, spheres: Vec) -> Vector3{
-  let cast_bounds = f32::MAX;
-  if (!ray_intersect(sphere, camera_position, direction, cast_bounds)){
+
+fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>) -> Vector3{
+  let mut N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+  let mut point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+  let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0));
+  if (!scene_intersect(origin, direction, spheres, point, N, material)){
     return Vector3::new(0.3, 0.3, 0.9);
   }
-  return Vector3::new(1.0, 0.0, 0.0);
+  return material.diffuse_color;
 }
 
 fn render_test_gradient(){
@@ -190,15 +209,15 @@ fn render_test_gradient(){
   let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &framebuffer);
 }
 
-fn render(spheres: Vec){
+fn render(spheres: &Vec<Sphere>){
   let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
-  let fov: f32 =  1.0;
+  let fov: f32 = 1.0;
   for y in 0..HEIGHT{
     for x in 0..WIDTH{
       let transform_x = (2.0*(x as f32 + 0.5)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
       let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
       let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
-      framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, spheres);
+      framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &spheres);
     }
   }
 
@@ -207,12 +226,12 @@ fn render(spheres: Vec){
 
 fn main(){
   let red = Material::new(Vector3::new(1.0, 0.0, 0.0));
-  let blue = Material::new(Vector3::new(1.0, 1.0, 0.0));
-  let green = Material::new(Vector3::new(1.0, 0.0, 1.0));
+  let blue = Material::new(Vector3::new(0.0, 1.0, 0.0));
+  let green = Material::new(Vector3::new(0.0, 0.0, 1.0));
 
   let mut spheres: Vec<Sphere> = Vec::new();
   spheres.push(Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 1.0, red));
   spheres.push(Sphere::new(Vector3::new(-1.0, 1.0, -16.0), 1.5, blue));
   
-  render(spheres)
+  render(&spheres)
 }
