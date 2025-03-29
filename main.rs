@@ -8,6 +8,20 @@ const HEIGHT: usize = 1024;
 const WIDTH: usize = 1024;
 
 #[derive(Debug, Copy, Clone)]
+struct Light{
+  intensity: f32,
+  transform: Vector3,
+}
+
+impl Light{
+
+  fn new(transform: Vector3, intensity: f32) -> Self {
+    Light {transform, intensity}
+  }
+  
+}
+
+#[derive(Debug, Copy, Clone)]
 struct Material{
   diffuse_color: Vector3,
 }
@@ -152,7 +166,6 @@ fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere
       hit = origin + direction*dist_i;
       N = (hit-spheres[i].transform).normalize();
       material = spheres[i].material;
-      println!("{:?}", material);
     }
   }
   if (spheres_distance < 1000.0){
@@ -189,12 +202,18 @@ fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -
 }
 
 
-fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>) -> Vector3{
+fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>) -> Vector3{
   let mut N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0));
-  if let Some((_, _, material)) = scene_intersect(origin, direction, &spheres, point, N, material) {
-    return material.diffuse_color;
+  let mut diffuse_light_intensity: f32 = 0.0;
+  if let Some((point, N, material)) = scene_intersect(origin, direction, &spheres, point, N, material) {
+    for i in 0..lights.len(){
+      let light_direction: Vector3 = (lights[i].transform - point).normalize();
+      diffuse_light_intensity += lights[i].intensity * light_direction.dot(&N).max(0.0);
+      println!("{:?}", light_direction.dot(&N));
+    }
+    return material.diffuse_color*diffuse_light_intensity;
   }
   return Vector3::new(0.3, 0.3, 0.9);
 }
@@ -213,7 +232,7 @@ fn render_test_gradient(){
   let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &framebuffer);
 }
 
-fn render(spheres: &Vec<Sphere>){
+fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
   let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
   let fov: f32 = 1.0;
   for y in 0..HEIGHT{
@@ -221,7 +240,7 @@ fn render(spheres: &Vec<Sphere>){
       let transform_x = (2.0*(x as f32 + 0.5)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
       let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
       let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
-      framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &spheres);
+      framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &spheres, &lights);
     }
   }
 
@@ -232,10 +251,13 @@ fn main(){
   let red = Material::new(Vector3::new(1.0, 0.0, 0.0));
   let blue = Material::new(Vector3::new(0.0, 1.0, 0.0));
   let green = Material::new(Vector3::new(0.0, 0.0, 1.0));
+  
+  let mut lights: Vec<Light> = Vec::new();
+  lights.push(Light::new(Vector3::new(-20.0, 20.0, 20.0), 150));
 
   let mut spheres: Vec<Sphere> = Vec::new();
   spheres.push(Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 1.0, red));
-  spheres.push(Sphere::new(Vector3::new(-1.0, 1.0, -16.0), 1.5, blue));
+  spheres.push(Sphere::new(Vector3::new(-1.0, 1.0, -16.0), 3.0, blue));
   
-  render(&spheres)
+  render(&spheres, &lights)
 }
