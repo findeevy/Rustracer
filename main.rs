@@ -143,7 +143,7 @@ fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, distance: 
   return !(point0 < 0.0);
 }
 
-fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &'a Vec<Sphere>, mut hit: Vector3, mut N: Vector3, mut material: &'a Material) -> bool{
+fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, mut hit: Vector3, mut N: Vector3, mut material: Material) -> Option<(Vector3, Vector3, Material)>{
   let mut spheres_distance = f32::MAX;  
   for i in 0..spheres.len() {
     let mut dist_i: f32 = 0.0;
@@ -151,10 +151,14 @@ fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &'a Vec<Sph
       spheres_distance = dist_i;
       hit = origin + direction*dist_i;
       N = (hit-spheres[i].transform).normalize();
-      material = &spheres[i].material;
+      material = spheres[i].material;
+      println!("{:?}", material);
     }
   }
-  return spheres_distance < 1000.0;
+  if (spheres_distance < 1000.0){
+    return Some((hit, N, material));
+  }
+  return None;
 }
 
 
@@ -189,10 +193,10 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>) -> Vecto
   let mut N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0));
-  if (!scene_intersect(origin, direction, spheres, point, N, &material)){
-    return Vector3::new(0.3, 0.3, 0.9);
+  if let Some((_, _, material)) = scene_intersect(origin, direction, &spheres, point, N, material) {
+    return material.diffuse_color;
   }
-  return material.diffuse_color;
+  return Vector3::new(0.3, 0.3, 0.9);
 }
 
 fn render_test_gradient(){
