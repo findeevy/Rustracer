@@ -4,7 +4,7 @@ use std::ops::{Add, Sub, Mul};
 use std::fs::File;
 use std::io::{self, Write};
 use std::process;
-const HEIGHT: usize = 1024;
+const HEIGHT: usize = 768;
 const WIDTH: usize = 1024;
 
 #[derive(Debug, Copy, Clone)]
@@ -24,12 +24,14 @@ impl Light{
 #[derive(Debug, Copy, Clone)]
 struct Material{
   diffuse_color: Vector3,
+  albedo: Vector2,
+  specular_exponent: f32,
 }
 
 impl Material{
 
-  fn new(diffuse_color: Vector3) -> Self {
-    Material {diffuse_color}
+  fn new(diffuse_color: Vector3, albedo: Vector2, specular_exponent: f32) -> Self {
+    Material {diffuse_color, albedo, specular_exponent}
   }
   
 }
@@ -47,6 +49,20 @@ impl Sphere{
     Sphere {transform, radius, material}
   }
   
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Vector2{
+  x: f32,
+  y: f32,
+}
+
+//Vector32functionality.
+impl Vector2{
+  //Initiate a new Vector2 of two floats.
+  fn new(x:f32, y:f32) -> Self {
+    Vector2 {x, y}
+  }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -70,6 +86,14 @@ impl Vector3{
   //Compute the dot product.
   fn dot(&self, other: &Vector3) -> f32 {
     self.x * other.x + self.y * other.y + self.z * other.z
+  }
+
+  fn addf(self, other: f32) -> Vector3{
+    Vector3{
+      x: self.x + other,
+      y: self.y + other,
+      z: self.z + other,
+    }
   }
   
   //Computes the length of the vector.
@@ -139,6 +163,10 @@ fn udiv(x: usize, y: usize) -> f32{
     return (x as f32)/(y as f32);
 }
 
+fn reflect(I: Vector3, N: Vector3) -> Vector3{
+  return I - N*2.0*(I.dot(&N));
+}
+
 fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, mut distance: f32) -> Option<f32>{
   let length = sphere.transform - origin;
   let ray = length.dot(&direction);
@@ -186,7 +214,7 @@ fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere
 
 
 //Write the framebuffer to a ppm file.
-fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -> io::Result<()>{
+fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &mut Vec<Vector3>) -> io::Result<()>{
     //Open the PPM file.
     let mut file = File::create("./out.ppm")?;
 
@@ -199,6 +227,15 @@ fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -
     for y in 0..height {
         for x in 0..width {
             //Scale between 0 to 255 and convert to u8.
+            let mut c = framebuffer[x+y*WIDTH];
+            let max = f32::max(c.x, f32::max(c.y, c.z)); 
+        
+            if max > 1.0 {
+                let scale_factor = 1.0 / max;
+                c = c * scale_factor;
+            } 
+            framebuffer[x+y*WIDTH] = c;
+
             let pixel_value = Vector3::new(framebuffer[x+y*WIDTH].x, framebuffer[x+y*WIDTH].y, framebuffer[x+y*WIDTH].z);
             let clamped = Vector3::tou8(pixel_value * 255.0);
             for i in clamped{
@@ -214,14 +251,16 @@ fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &Vec<Vector3>) -
 fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>) -> Vector3{
   let mut N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-  let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0));
+  let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector2::new(0.0, 0.0), 0.0);
   let mut diffuse_light_intensity: f32 = 0.0;
+  let mut specular_light_intensity: f32 = 0.0;
   if let Some((point, N, material)) = scene_intersect(origin, direction, &spheres, point, N, material) {
     for i in 0..lights.len(){
       let light_direction: Vector3 = (lights[i].transform - point).normalize();
       diffuse_light_intensity += lights[i].intensity * light_direction.dot(&N).max(0.0);
+      specular_light_intensity += (f32::max(0.0, (reflect(light_direction * -1.0, N)* -1.0).dot(&direction))).powf(material.specular_exponent) * lights[i].intensity;
     }
-    return material.diffuse_color*diffuse_light_intensity;
+    return (material.diffuse_color * diffuse_light_intensity * material.albedo.x) + ((Vector3::new(1.0, 1.0, 1.0)) * specular_light_intensity * material.albedo.y);
   }
   return Vector3::new(0.1, 0.1, 0.7);
 }
@@ -237,7 +276,7 @@ fn render_test_gradient(){
   }
 
   //Write our gradient to a PPM.
-  let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &framebuffer);
+  let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &mut framebuffer);
 }
 
 fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
@@ -252,22 +291,23 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
     }
   }
 
-  let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &framebuffer);
+  let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &mut framebuffer);
 }
 
 fn main(){
-  let red = Material::new(Vector3::new(1.0, 0.0, 0.0));
-  let blue = Material::new(Vector3::new(0.0, 1.0, 0.0));
-  let green = Material::new(Vector3::new(0.0, 0.0, 1.0));
+  let shiny = Material::new(Vector3::new(0.4, 0.4, 0.4), Vector2::new(0.6, 0.3), 80.0);
+  let dull = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector2::new(0.9, 0.1), 10.0);
   
   let mut lights: Vec<Light> = Vec::new();
-  lights.push(Light::new(Vector3::new(-16.0, 20.0, 20.0), 1.2));
+  lights.push(Light::new(Vector3::new(-16.0, 20.0, 20.0), 1.5));
+  lights.push(Light::new(Vector3::new(30.0, 50.0, -25.0), 1.8));
+  lights.push(Light::new(Vector3::new(36.0, 20.0, 30.0), 1.7));
 
   let mut spheres: Vec<Sphere> = Vec::new();
-  spheres.push(Sphere::new(Vector3::new(-7.0, 0.0, -15.0), 4.0, red));
-  spheres.push(Sphere::new(Vector3::new(-1.5, -2.0, -13.0), 2.0, blue));
-  spheres.push(Sphere::new(Vector3::new(1.5, -0.5, -18.0), 3.0, green));
-  spheres.push(Sphere::new(Vector3::new(5.0, 4.0, -18.0), 3.0, red));
+  spheres.push(Sphere::new(Vector3::new(-7.0, 0.0, -15.0), 4.0, dull));
+  spheres.push(Sphere::new(Vector3::new(-1.5, -2.0, -13.0), 2.0, shiny));
+  spheres.push(Sphere::new(Vector3::new(1.5, -0.5, -18.0), 3.0, shiny));
+  spheres.push(Sphere::new(Vector3::new(5.0, 4.0, -18.0), 3.0, dull));
   
   render(&spheres, &lights)
 }
