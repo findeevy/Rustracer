@@ -3,7 +3,7 @@
 use std::ops::{Add, Sub, Mul};
 use std::fs::File;
 use std::io::{self, Write};
-
+use std::process;
 const HEIGHT: usize = 1024;
 const WIDTH: usize = 1024;
 
@@ -139,33 +139,42 @@ fn udiv(x: usize, y: usize) -> f32{
     return (x as f32)/(y as f32);
 }
 
-fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, distance: f32) -> bool{
+fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, mut distance: f32) -> Option<f32>{
   let length = sphere.transform - origin;
   let ray = length.dot(&direction);
   //println!("{}", ray);
-  let difference_of_squares = length.dot(&length) - ray*ray;
+  let difference_of_squares = (length.dot(&length)) - ray*ray;
   //println!("{}", difference_of_squares);
-  if (difference_of_squares > sphere.radius){
-    return false;
+  if (difference_of_squares > sphere.radius*sphere.radius){
+    return None;
   }
   let temp = (sphere.radius*sphere.radius - difference_of_squares).sqrt();
-  let mut point0 = ray - temp;
+  distance = ray - temp;
   let point1 = ray + temp;
-  if (point0 < 0.0){
-    point0 = point1;
+  if (distance < 0.0){
+    distance = point1;
   }
-  return !(point0 < 0.0);
+  if !(distance < 0.0){
+    return Some((distance));
+  }
+  else{
+    return None;
+  }
 }
 
 fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, mut hit: Vector3, mut N: Vector3, mut material: Material) -> Option<(Vector3, Vector3, Material)>{
   let mut spheres_distance = f32::MAX;  
   for i in 0..spheres.len() {
     let mut dist_i: f32 = 0.0;
-    if (ray_intersect(spheres[i], origin, direction, dist_i) && dist_i < spheres_distance){
-      spheres_distance = dist_i;
-      hit = origin + direction*dist_i;
-      N = (hit-spheres[i].transform).normalize();
-      material = spheres[i].material;
+    if let Some((dist_i)) = ray_intersect(spheres[i], origin, direction, dist_i){
+      if dist_i < spheres_distance {
+        spheres_distance = dist_i;
+        hit = origin + direction*dist_i;
+        //println!("{:?}", hit);
+        //process::exit(0);
+        N = (hit-spheres[i].transform).normalize();
+        material = spheres[i].material;
+      }
     }
   }
   if (spheres_distance < 1000.0){
@@ -211,11 +220,10 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
     for i in 0..lights.len(){
       let light_direction: Vector3 = (lights[i].transform - point).normalize();
       diffuse_light_intensity += lights[i].intensity * light_direction.dot(&N).max(0.0);
-      println!("{:?}", light_direction.dot(&N));
     }
     return material.diffuse_color*diffuse_light_intensity;
   }
-  return Vector3::new(0.3, 0.3, 0.9);
+  return Vector3::new(0.1, 0.1, 0.7);
 }
 
 fn render_test_gradient(){
@@ -253,11 +261,13 @@ fn main(){
   let green = Material::new(Vector3::new(0.0, 0.0, 1.0));
   
   let mut lights: Vec<Light> = Vec::new();
-  lights.push(Light::new(Vector3::new(-20.0, 20.0, 20.0), 150));
+  lights.push(Light::new(Vector3::new(-16.0, 20.0, 20.0), 1.2));
 
   let mut spheres: Vec<Sphere> = Vec::new();
-  spheres.push(Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 1.0, red));
-  spheres.push(Sphere::new(Vector3::new(-1.0, 1.0, -16.0), 3.0, blue));
+  spheres.push(Sphere::new(Vector3::new(-7.0, 0.0, -15.0), 4.0, red));
+  spheres.push(Sphere::new(Vector3::new(-1.5, -2.0, -13.0), 2.0, blue));
+  spheres.push(Sphere::new(Vector3::new(1.5, -0.5, -18.0), 3.0, green));
+  spheres.push(Sphere::new(Vector3::new(5.0, 4.0, -18.0), 3.0, red));
   
   render(&spheres, &lights)
 }
