@@ -2,10 +2,10 @@
 A custom software raytraced 3D renderer that uses no external libraries or frameworks for it's rendering model. 
 
 ## Features:
-*Diffuse lighting.
-*Specular illumination.
-*PPM output.
-*Fast low-level performance.
+-Diffuse lighting.
+-Specular illumination.
+-PPM output.
+-Fast low-level performance.
 
 ## Compilation:
 Install [Rust]((https://www.rust-lang.org/tools/install)) and then run "rustc main.rs -o rustracer" for Linux or "rustc main.rs -o rustracer.exe" on Windows.
