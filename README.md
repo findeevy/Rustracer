@@ -1,5 +1,6 @@
 # Rustracer
 A custom software raytraced 3D renderer that uses no external libraries or frameworks for it's rendering model. 
+![A raytraced render from Rustracer.](out.png "Render")
 
 ## Features:
 -Diffuse lighting.\
