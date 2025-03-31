@@ -17,14 +17,15 @@ impl Light{
 #[derive(Debug, Copy, Clone)]
 pub struct Material{
   pub diffuse_color: Vector3,
-  pub albedo: Vector3,
+  pub albedo: Vector4,
   pub specular_exponent: f32,
+  pub refractive_index: f32,
 }
 
 impl Material{
 
-  pub fn new(diffuse_color: Vector3, albedo: Vector3, specular_exponent: f32) -> Self {
-    Material {diffuse_color, albedo, specular_exponent}
+  pub fn new(diffuse_color: Vector3, albedo: Vector4, specular_exponent: f32, refractive_index: f32) -> Self {
+    Material {diffuse_color, albedo, specular_exponent, refractive_index}
   }
   
 }
@@ -149,4 +150,20 @@ impl Mul<f32> for Vector3{
     }
   }
 
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Vector4{
+  pub x: f32,
+  pub y: f32,
+  pub z: f32,
+  pub a: f32,
+}
+
+//Vector32functionality.
+impl Vector4{
+  //Initiate a new Vector2 of two floats.
+  pub fn new(x:f32, y:f32, z:f32, a:f32) -> Self {
+    Vector4 {x, y, z, a}
+  }
 }

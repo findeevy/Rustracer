@@ -1,5 +1,8 @@
 #![allow(warnings)]
+
 mod definitions;
+
+use definitions::Vector4;
 use definitions::Vector3;
 use definitions::Vector2;
 use definitions::Light;
@@ -10,15 +13,37 @@ use std::ops::{Add, Sub, Mul};
 use std::fs::File;
 use std::io::{self, Write};
 use std::process;
+use std::mem;
 
-const HEIGHT: usize = 1000;
-const WIDTH: usize = 1000;
+const HEIGHT: usize = 480;
+const WIDTH: usize = 640;
 const BACKGROUND_COLOR: Vector3 = Vector3{x: 0.3, y: 0.8, z: 0.9};
-const REFLECTION_DEPTH: i32 = 6;
+const PATH_DEPTH: i32 = 5;
 
 //Divide two usizes and return a float.
 fn udiv(x: usize, y: usize) -> f32{
     return (x as f32)/(y as f32);
+}
+
+fn refract(I: Vector3, N: Vector3, refractive_index: f32) -> Vector3{
+  let mut cosi: f32 = -1.0*(f32::max(-1.0, f32::min(1.0, I.dot(&N))));
+  let mut etai: f32 = 1.0;
+  let mut etat: f32 = refractive_index;
+  let mut n: Vector3 = N;
+
+  if cosi < 0.0{
+    cosi = cosi*(-1.0);
+    mem::swap(&mut etai, &mut etat);
+    n = N*(-1.0);
+  }
+
+  let eta: f32 = etai / etat;
+  let k: f32 = 1.0 - eta*eta*(1.0-cosi*cosi);
+
+  if k < 0.0{
+    return Vector3::new(0.0, 0.0, 0.0);
+  }
+  return I*eta + n*(eta*cosi-k.sqrt());
 }
 
 fn reflect(I: Vector3, N: Vector3) -> Vector3{
@@ -67,8 +92,6 @@ fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere
   return None;
 }
 
-
-
 //Write the framebuffer to a ppm file.
 fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &mut Vec<Vector3>) -> io::Result<()>{
     //Open the PPM file.
@@ -103,29 +126,40 @@ fn framebuffer_to_ppm(width: usize, height: usize, framebuffer: &mut Vec<Vector3
     Ok(())
 }
 
-
 fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>, depth: i32) -> Vector3{
   let mut N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-  let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0), 0.0);
+  let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
   let mut diffuse_light_intensity: f32 = 0.0;
   let mut specular_light_intensity: f32 = 0.0;
-  if (depth < REFLECTION_DEPTH){
+  if (depth <= PATH_DEPTH){
     if let Some((point, N, material)) = scene_intersect(origin, direction, &spheres, point, N, material) {
       let mut reflect_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+      let mut refract_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       for i in 0..lights.len(){
         let light_direction: Vector3 = (lights[i].transform - point).normalize();
         let light_distance = (lights[i].transform - point).magnitude();
         //Checking for reflections.
         let reflect_direction: Vector3 = reflect(direction, N).normalize();
+        let refract_direction: Vector3 = refract(direction, N, material.refractive_index).normalize();
         let mut reflect_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+        let mut refract_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
         if (reflect_direction.dot(&N) < 0.0){
           reflect_origin = point - (N * 0.001);
         }
         else{
           reflect_origin = point + (N * 0.001);
         }
+
+        if (refract_direction.dot(&N) < 0.0){
+          refract_origin = point - (N * 0.001);
+        }
+        else{
+          refract_origin = point + (N * 0.001);
+        }
+
         reflect_color = cast_ray(reflect_origin, reflect_direction, spheres, lights, depth + 1);
+        refract_color = cast_ray(refract_origin, refract_direction, spheres, lights, depth + 1);
         //Checking for shadows here.
         let mut shadow_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
         if (light_direction.dot(&N) < 0.0){
@@ -136,7 +170,7 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
         }
         let shadow_pt: Vector3 = Vector3::new(0.0, 0.0, 0.0);
         let shadow_N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-        let temp_material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0), 0.0);
+        let temp_material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
         if let Some((shadow_pt, shadow_N, temp_material)) = scene_intersect(shadow_origin, light_direction, &spheres, shadow_pt, shadow_N, temp_material){
           if ((shadow_pt-shadow_origin).magnitude() < light_distance){
             continue;
@@ -145,24 +179,10 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
         diffuse_light_intensity += lights[i].intensity * light_direction.dot(&N).max(0.0);
         specular_light_intensity += (f32::max(0.0, (reflect(light_direction * -1.0, N)* -1.0).dot(&direction))).powf(material.specular_exponent) * lights[i].intensity;
       }
-      return (material.diffuse_color * diffuse_light_intensity * material.albedo.x) + ((Vector3::new(1.0, 1.0, 1.0)) * specular_light_intensity * material.albedo.y) + reflect_color*material.albedo.z;
+      return (material.diffuse_color * diffuse_light_intensity * material.albedo.x) + ((Vector3::new(1.0, 1.0, 1.0)) * specular_light_intensity * material.albedo.y) + reflect_color*material.albedo.z + refract_color*material.albedo.a;
     }
   }
   return BACKGROUND_COLOR;
-}
-
-fn render_test_gradient(){
-  let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
-  
-  //Create a gradient of pixels.
-  for y in 0..HEIGHT{
-    for x in 0..WIDTH{
-      framebuffer[x+y*WIDTH] = Vector3::new(udiv(y, HEIGHT), 0.0, udiv(x, WIDTH));
-    }
-  }
-
-  //Write our gradient to a PPM.
-  let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &mut framebuffer);
 }
 
 fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
@@ -174,7 +194,7 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
       let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
       let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
       framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &spheres, &lights, 0);
-      print!("\r{:?}% of the image rendered.", (udiv(x+y*WIDTH, HEIGHT*WIDTH)*100.0) as i32);
+      print!("\r{:?}% of the image rendered.", (udiv(x+y*WIDTH, HEIGHT*WIDTH)*100.0 + 1.0) as i32);
       std::io::stdout().flush().unwrap();
     }
   }
@@ -185,9 +205,10 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
 }
 
 fn main(){
-  let shiny = Material::new(Vector3::new(0.4, 0.3, 0.4), Vector3::new(0.6, 0.3, 0.1), 60.0);
-  let dull = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector3::new(0.9, 0.1, 0.0), 10.0);
-  let mirror = Material::new(Vector3::new(1.0, 1.0, 1.0), Vector3::new(0.0, 10.0, 0.8), 1400.0);
+  let shiny = Material::new(Vector3::new(0.4, 0.3, 0.4), Vector4::new(0.6, 0.3, 0.1, 0.0), 60.0, 1.0);
+  let dull = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
+  let mirror = Material::new(Vector3::new(1.0, 1.0, 1.0), Vector4::new(0.0, 10.0, 0.8, 0.0), 1400.0, 1.0);
+  let glass = Material::new(Vector3::new(0.6, 0.7, 0.8), Vector4::new(0.0,  0.5, 0.1, 0.8), 125.0, 1.5);
 
   let mut lights: Vec<Light> = Vec::new();
   lights.push(Light::new(Vector3::new(-20.0, 20.0, 20.0), 1.5));
@@ -196,7 +217,7 @@ fn main(){
 
   let mut spheres: Vec<Sphere> = Vec::new();
   spheres.push(Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 3.0, shiny));
-  spheres.push(Sphere::new(Vector3::new(-1.0, -1.5, -12.0), 1.0, mirror));
+  spheres.push(Sphere::new(Vector3::new(-1.0, -1.5, -12.0), 1.0, glass));
   spheres.push(Sphere::new(Vector3::new(0.5, -0.5, -20.0), 2.0, dull));
   spheres.push(Sphere::new(Vector3::new(7.0, 5.0, -18.0), 4.0, mirror));
   
