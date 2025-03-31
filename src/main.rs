@@ -54,8 +54,6 @@ fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere
       if dist_i < spheres_distance {
         spheres_distance = dist_i;
         hit = origin + direction*dist_i;
-        //println!("{:?}", hit);
-        //process::exit(0);
         N = (hit-spheres[i].transform).normalize();
         material = spheres[i].material;
       }
@@ -117,22 +115,19 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
       //Checking for shadows here.
       let mut shadow_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       if (light_direction.dot(&N) < 0.0){
-        shadow_origin = point + (N * 0.001);
+        shadow_origin = point - (N * 0.001);
       }
       else{
-        shadow_origin = point - (N * 0.001);
+        shadow_origin = point + (N * 0.001);
       }
       let shadow_pt: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       let shadow_N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       let temp_material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector2::new(1.0, 0.1), 0.0);
-      //process::exit(0)
       if let Some((shadow_pt, shadow_N, temp_material)) = scene_intersect(shadow_origin, light_direction, &spheres, shadow_pt, shadow_N, temp_material){
         if ((shadow_pt-shadow_origin).magnitude() < light_distance){
-          println!("{:?}", shadow_pt);
-          process::exit(0);
+          continue;
         }
       }
-      println!("OOP");
       diffuse_light_intensity += lights[i].intensity * light_direction.dot(&N).max(0.0);
       specular_light_intensity += (f32::max(0.0, (reflect(light_direction * -1.0, N)* -1.0).dot(&direction))).powf(material.specular_exponent) * lights[i].intensity;
     }
