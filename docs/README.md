@@ -1,5 +1,5 @@
 # Rustracer
-A custom software raytraced 3D renderer that uses no external libraries or frameworks for it's rendering model. I'm writing it to better understand graphics programming, low-level systems, and Rust.
+A custom software raytraced 3D renderer that uses no external libraries or frameworks for its rendering model. I'm writing it to better understand graphics programming, low-level systems, and Rust.
 
 ## Features:
 -Diffuse lighting.\
