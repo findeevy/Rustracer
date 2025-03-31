@@ -17,13 +17,13 @@ impl Light{
 #[derive(Debug, Copy, Clone)]
 pub struct Material{
   pub diffuse_color: Vector3,
-  pub albedo: Vector2,
+  pub albedo: Vector3,
   pub specular_exponent: f32,
 }
 
 impl Material{
 
-  pub fn new(diffuse_color: Vector3, albedo: Vector2, specular_exponent: f32) -> Self {
+  pub fn new(diffuse_color: Vector3, albedo: Vector3, specular_exponent: f32) -> Self {
     Material {diffuse_color, albedo, specular_exponent}
   }
   
