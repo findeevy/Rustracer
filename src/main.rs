@@ -10,9 +10,9 @@ use std::ops::{Add, Sub, Mul};
 use std::fs::File;
 use std::io::{self, Write};
 use std::process;
+
 const HEIGHT: usize = 768;
 const WIDTH: usize = 1024;
-
 
 //Divide two usizes and return a float.
 fn udiv(x: usize, y: usize) -> f32{
@@ -113,6 +113,26 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
   if let Some((point, N, material)) = scene_intersect(origin, direction, &spheres, point, N, material) {
     for i in 0..lights.len(){
       let light_direction: Vector3 = (lights[i].transform - point).normalize();
+      let light_distance = (lights[i].transform - point).magnitude();
+      //Checking for shadows here.
+      let mut shadow_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+      if (light_direction.dot(&N) < 0.0){
+        shadow_origin = point + (N * 0.001);
+      }
+      else{
+        shadow_origin = point - (N * 0.001);
+      }
+      let shadow_pt: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+      let shadow_N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+      let temp_material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector2::new(1.0, 0.1), 0.0);
+      //process::exit(0)
+      if let Some((shadow_pt, shadow_N, temp_material)) = scene_intersect(shadow_origin, light_direction, &spheres, shadow_pt, shadow_N, temp_material){
+        if ((shadow_pt-shadow_origin).magnitude() < light_distance){
+          println!("{:?}", shadow_pt);
+          process::exit(0);
+        }
+      }
+      println!("OOP");
       diffuse_light_intensity += lights[i].intensity * light_direction.dot(&N).max(0.0);
       specular_light_intensity += (f32::max(0.0, (reflect(light_direction * -1.0, N)* -1.0).dot(&direction))).powf(material.specular_exponent) * lights[i].intensity;
     }
@@ -155,15 +175,15 @@ fn main(){
   let dull = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector2::new(0.9, 0.1), 10.0);
   
   let mut lights: Vec<Light> = Vec::new();
-  lights.push(Light::new(Vector3::new(-16.0, 20.0, 20.0), 1.5));
+  lights.push(Light::new(Vector3::new(-20.0, 20.0, 20.0), 1.5));
   lights.push(Light::new(Vector3::new(30.0, 50.0, -25.0), 1.8));
-  lights.push(Light::new(Vector3::new(36.0, 20.0, 30.0), 1.7));
+  lights.push(Light::new(Vector3::new(30.0, 20.0, 30.0), 1.7));
 
   let mut spheres: Vec<Sphere> = Vec::new();
-  spheres.push(Sphere::new(Vector3::new(-7.0, 0.0, -15.0), 4.0, dull));
-  spheres.push(Sphere::new(Vector3::new(-1.5, -2.0, -13.0), 2.0, shiny));
+  spheres.push(Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 2.0, dull));
+  spheres.push(Sphere::new(Vector3::new(-1.0, -1.5, -12.0), 2.0, shiny));
   spheres.push(Sphere::new(Vector3::new(1.5, -0.5, -18.0), 3.0, shiny));
-  spheres.push(Sphere::new(Vector3::new(5.0, 4.0, -18.0), 3.0, dull));
+  spheres.push(Sphere::new(Vector3::new(7.0, 5.0, -18.0), 4.0, dull));
   
   render(&spheres, &lights)
 }
