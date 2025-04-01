@@ -14,15 +14,24 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::process;
 use std::mem;
+use std::time::{SystemTime, UNIX_EPOCH, Instant};
 
 const HEIGHT: usize = 480;
 const WIDTH: usize = 640;
 const BACKGROUND_COLOR: Vector3 = Vector3{x: 0.3, y: 0.8, z: 0.9};
 const PATH_DEPTH: i32 = 5;
+const ANTI_ALIAS: i32 = 3;
 
 //Divide two usizes and return a float.
 fn udiv(x: usize, y: usize) -> f32{
     return (x as f32)/(y as f32);
+}
+
+fn random_f32() -> f32{
+    let duration_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time error.");
+    let seed = duration_since_epoch.as_nanos();
+    let random_number = (seed % 1000) as f32 / 1000.0;
+    return random_number;
 }
 
 fn refract(I: Vector3, N: Vector3, refractive_index: f32) -> Vector3{
@@ -190,18 +199,19 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
   let fov: f32 = 1.0;
   for y in 0..HEIGHT{
     for x in 0..WIDTH{
-      let transform_x = (2.0*(x as f32 + 0.5)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
-      let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
-      let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
-      framebuffer[x+y*WIDTH] = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &spheres, &lights, 0);
+      for i in 0..ANTI_ALIAS{
+        let transform_x = (2.0*(x as f32 + 0.5 + (random_f32() - 0.5)*0.25)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
+        let transform_y = -1.0*(2.0*(y as f32 + 0.5 + (random_f32() - 0.5)*0.25)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
+        let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
+        framebuffer[x+y*WIDTH] = framebuffer[x+y*WIDTH] + (cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &spheres, &lights, 0)) * (1.0/(ANTI_ALIAS as f32));
+      }
       print!("\r{:?}% of the image rendered.", (udiv(x+y*WIDTH, HEIGHT*WIDTH)*100.0 + 1.0) as i32);
       std::io::stdout().flush().unwrap();
     }
   }
   
-  println!("\nWriting to disk.");
+  println!("\nWriting image to disk.");
   let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &mut framebuffer);
-  println!("Completed!");
 }
 
 fn main(){
@@ -222,6 +232,8 @@ fn main(){
   spheres.push(Sphere::new(Vector3::new(7.0, 5.0, -18.0), 4.0, mirror));
   
   println!("Welcome to Rustracer, beginning your render...");
-
-  render(&spheres, &lights)
+  let start_time = Instant::now();
+  render(&spheres, &lights);
+  let duration = start_time.elapsed();
+  println!("Render took {} seconds. Completed.", duration.as_secs_f64());
 }

@@ -4,7 +4,8 @@ A custom software raytraced 3D renderer that uses no external libraries or frame
 ## Features:
 -Diffuse lighting.\
 -Specular illumination.\
--Raytraced reflections and shadows.\
+-Raytraced reflections, refraction, and shadows.\
+-Anti-Aliasing\
 -PPM output.\
 -Fast low-level performance.
 
