@@ -1,1 +1,1 @@
-rustc src/main.rs -o ./Rustracer
+rustc src/main.rs -o ./Rustracer && ./Rustracer
