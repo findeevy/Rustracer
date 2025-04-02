@@ -16,12 +16,13 @@ use std::process;
 use std::mem;
 use std::thread;
 use std::time::{SystemTime, Instant};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
+use std::sync::mpsc::sync_channel;
 
 const HEIGHT: usize = 1200;
 const WIDTH: usize = 1600;
 const BACKGROUND_COLOR: Vector3 = Vector3{x: 0.3, y: 0.6, z: 0.9};
-const PATH_DEPTH: i32 = 1;
+const PATH_DEPTH: i32 = 5;
 const FOURX_AA: [Vector2; 4] = [Vector2{x: 0.25, y: 0.25}, Vector2{x: -0.25, y: 0.25}, Vector2{x: 0.25, y: -0.25}, Vector2{x: -0.25, y:-0.25}];
 
 //Divide two usizes and return a float.
@@ -200,32 +201,32 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
       eprintln!("Failed to get available threads: {}", e);
     }
   }
-  let mut framebuffer: Arc<Mutex<Vec<Vector3>>> = Arc::new(Mutex::new(vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT]));
+
   let fov: f32 = 1.0;
   let mut handles = vec![];
-
+  let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
   let spheres_arc = Arc::new(spheres.clone());
   let lights_arc = Arc::new(lights.clone());
-
+  let (tx, rx) = sync_channel(threads);
   for j in 0..threads{
     let start_y = ((j as f32)*udiv(HEIGHT, threads)) as usize;
     let end_y = ((j as f32 + 1.0)*udiv(HEIGHT, threads)) as usize;
-
+    let tx = tx.clone();
     let spheres_clone = Arc::clone(&spheres_arc);
     let lights_clone = Arc::clone(&lights_arc);
 
-    let framebuffer_clone = Arc::clone(&framebuffer);
     let handle = thread::spawn(move || {
-    let mut framebuffer = framebuffer_clone.lock().unwrap();
     for y in start_y..end_y{
       for x in 0..WIDTH{
+        let mut color = Vector3::new(0.0, 0.0, 0.0);
         for i in 0..FOURX_AA.len(){
           let transform_x = (2.0*(x as f32 + 0.5 + FOURX_AA[i].x)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
           let transform_y = -1.0*(2.0*(y as f32 + 0.5 + FOURX_AA[i].y)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
           let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
-          framebuffer[x+y*WIDTH] = framebuffer[x+y*WIDTH] + (cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, 0)) * (1.0/(FOURX_AA.len() as f32));
+          color = color + (cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, 0)) * (1.0/(FOURX_AA.len() as f32));
         }
-        print!("\r{:?}% of the image rendered.", (udiv(x+y*WIDTH, HEIGHT*WIDTH)*100.0 + 1.0) as i32);
+        tx.send((color, x+y*WIDTH)).unwrap();
+        //print!("\r{:?}% of the image rendered.", (udiv(x+y*WIDTH, HEIGHT*WIDTH)*100.0 + 1.0) as i32);
         std::io::stdout().flush().unwrap();
       }
     }
@@ -233,12 +234,17 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
     handles.push(handle);
   }
   
+  drop(tx);
+
+  while let Ok(msg) = rx.recv() {
+    let (x, y) = msg;
+    framebuffer[y] = x;
+  }
+
   for handle in handles {
     handle.join().unwrap();
   }
   
-  let mut framebuffer = framebuffer.lock().unwrap();
-
   println!("\nWriting image to disk.");
   let _ = framebuffer_to_ppm(WIDTH, HEIGHT, &mut framebuffer);
 }
