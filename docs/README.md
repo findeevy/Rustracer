@@ -2,9 +2,10 @@
 A custom software raytraced 3D renderer that uses no external libraries or frameworks for its rendering model. I'm writing it to better understand graphics programming, low-level systems, and Rust.
 
 ## Features:
+-Raytraced reflections, refraction, and shadows.\
+-Multithreading support.\
 -Diffuse lighting.\
 -Specular illumination.\
--Raytraced reflections, refraction, and shadows.\
 -Anti-Aliasing\
 -PPM output.\
 -Fast low-level performance.
