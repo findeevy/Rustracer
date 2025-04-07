@@ -1,5 +1,8 @@
 use std::ops::{Add, Sub, Mul};
 
+mod definitions;
+use definitions::Vector3;
+
 #[derive(Debug, Copy, Clone)]
 pub struct Light{
   pub intensity: f32,

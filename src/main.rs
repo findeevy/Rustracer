@@ -24,8 +24,8 @@ use std::sync::mpsc::sync_channel;
 //Constants
 const BACKGROUND_COLOR: Vector3 = Vector3{x: 0.3, y: 0.6, z: 0.9};
 const PATH_DEPTH: i32 = 4;
-const HEIGHT: usize = 1000;
-const WIDTH: usize = 1000;
+const HEIGHT: usize = 100;
+const WIDTH: usize = 100;
 const FOURX_AA: [Vector2; 4] = [Vector2{x: 0.25, y: 0.25}, Vector2{x: -0.25, y: 0.25}, Vector2{x: 0.25, y: -0.25}, Vector2{x: -0.25, y:-0.25}];
 
 //Divide two usizes and return a float.
@@ -251,6 +251,7 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
         tx.send((color, x+y*WIDTH)).unwrap();
       }
     }
+    println!("{} completed!", j);
     });
     //Push newly created thread.
     handles.push(handle);
