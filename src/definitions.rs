@@ -1,8 +1,4 @@
 use std::ops::{Add, Sub, Mul};
-
-mod definitions;
-use definitions::Vector3;
-
 #[derive(Debug, Copy, Clone)]
 pub struct Light{
   pub intensity: f32,
@@ -61,6 +57,20 @@ impl Vector2{
     Vector2 {x, y}
   }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub struct Vector3i{
+  pub x: i32,
+  pub y: i32,
+  pub z: i32,
+}
+
+impl Vector3i{
+  pub fn new(x:i32, y:i32, z:i32) -> Self{
+    Vector3i {x, y, z}
+  }
+}
+
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vector3{

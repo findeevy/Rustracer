@@ -251,7 +251,6 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
         tx.send((color, x+y*WIDTH)).unwrap();
       }
     }
-    println!("{} completed!", j);
     });
     //Push newly created thread.
     handles.push(handle);
