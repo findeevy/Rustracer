@@ -42,7 +42,20 @@ impl Model{
             let mut f = Vector3::new(0.0, 0.0, 0.0);
             let mut count = 0;
             while let Some(idx_str) = parts.next(){
-                //Finish.
+              if let Ok(idk) = idx_str.parse::<i32>(){
+                if count < 3 {
+                  match count {
+                    0 => f.x = idx - 1,
+                    1 => f.y = idx - 1,
+                    2 => f.z = idx - 1,
+                    _ => {}
+                  }
+                }
+              }
+              count += 1;
+            }
+            if count == 3 {
+              faces.push(f);
             }
           }
 
