@@ -1,6 +1,10 @@
 #![allow(warnings)]
 
 mod definitions;
+mod model;
+
+//Import our model struct from model.rs
+use model::Model;
 
 //Import all of our structs from definitions.rs
 use definitions::Vector4;
@@ -278,7 +282,10 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
 }
 
 fn main(){
-
+  let temp = Model::new("res/monkey.obj");
+  println!("{:?}", temp.faces);
+  println!("{:?}", temp.verts);
+  /*
   //Initialize some materials, lights, and objects.
   let shiny = Material::new(Vector3::new(0.4, 0.3, 0.4), Vector4::new(0.6, 0.3, 0.1, 0.0), 60.0, 1.0);
   let dull = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
@@ -299,4 +306,5 @@ fn main(){
   //Begin the render!
   println!("Welcome to Rustracer, beginning your render...");
   render(&spheres, &lights);
+  */
 }
