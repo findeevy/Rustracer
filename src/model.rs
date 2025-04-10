@@ -79,8 +79,13 @@ impl Model{
   return Model {verts, faces};
   }
 
-  pub fn triangle_intersect() -> bool {
+  pub fn triangle_intersect(fi: &i32, origin: &Vector3, direction: &Vector3, tnear: &f32) -> bool {
+    //let edge1: Vector3 =
     return false;
   }
+
+  /*pub fn vert(fi: i32, li: i32) -> i32{
+      
+  }*/
 }
  
