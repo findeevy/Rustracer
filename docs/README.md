@@ -8,6 +8,7 @@ A custom software raytraced 3D renderer that uses no external libraries or frame
 -Specular illumination.\
 -Anti-Aliasing\
 -PPM output.\
+-".obj" input.
 -Fast low-level performance.
 
 ## Compilation:
