@@ -17,7 +17,7 @@ use definitions::Material;
 //Import all of the standard libraries we need.
 use std::ops::{Add, Sub, Mul};
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, Write, BufRead, BufReader};
 use std::process;
 use std::mem;
 use std::thread;
@@ -27,10 +27,11 @@ use std::sync::mpsc::sync_channel;
 
 //Constants
 const BACKGROUND_COLOR: Vector3 = Vector3{x: 0.3, y: 0.6, z: 0.9};
-const PATH_DEPTH: i32 = 4;
-const HEIGHT: usize = 100;
-const WIDTH: usize = 100;
+const PATH_DEPTH: i32 = 3;
+const HEIGHT: usize = 720;
+const WIDTH: usize = 1280;
 const FOURX_AA: [Vector2; 4] = [Vector2{x: 0.25, y: 0.25}, Vector2{x: -0.25, y: 0.25}, Vector2{x: 0.25, y: -0.25}, Vector2{x: -0.25, y:-0.25}];
+const ANTI_ALIAS: bool = true;
 
 //Divide two usizes and return a float.
 fn udiv(x: usize, y: usize) -> f32{
@@ -64,8 +65,8 @@ fn reflect(I: Vector3, N: Vector3) -> Vector3{
   return I - N*2.0*(I.dot(&N));
 }
 
-//Checks if a ray hits an object.
-fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, mut distance: f32) -> Option<f32>{
+//Checks if a ray hits a sphere.
+fn sphere_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, mut distance: f32) -> Option<f32>{
   let length = sphere.transform - origin;
   let ray = length.dot(&direction);
   let difference_of_squares = (length.dot(&length)) - ray*ray;
@@ -86,21 +87,78 @@ fn ray_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, mut distan
   }
 }
 
+//Checks if a ray hits a triangle (normally in a mesh).
+fn triangle_intersect(origin: Vector3, direction: Vector3, v0: Vector3, v1: Vector3, v2: Vector3, transform: Vector3) -> Option<(f32, Vector3)> {
+  let v0 = v0 + transform;
+  let v1 = v1 + transform;
+  let v2 = v2 + transform;
+  let edge1 = v1 - v0;
+  let edge2 = v2 - v0;
+  let h = direction.cross(&edge2);
+  let a = edge1.dot(&h);
+
+  if (a.abs() < 0.0001){ 
+    return None; 
+  }
+
+  let f = 1.0 / a;
+  let s = origin - v0;
+  let u = f * s.dot(&h);
+
+  if !(0.0..=1.0).contains(&u){ 
+    return None; 
+  }
+
+  let q = s.cross(&edge1);
+  let v = f * direction.dot(&q);
+
+  if (v < 0.0 || u + v > 1.0){ 
+    return None; 
+  }
+
+  let t = f * edge2.dot(&q);
+  if (t > 0.0001){
+    let normal = edge1.cross(&edge2).normalize();
+    return Some((t, normal));
+  } 
+  else{
+    return None;
+  }
+}
+
 //Runs through list of objects in the scene and checks for intersection.
-fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, mut hit: Vector3, mut N: Vector3, mut material: Material) -> Option<(Vector3, Vector3, Material)>{
-  let mut spheres_distance = f32::MAX;  
+fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, meshes: &Vec<Model>, mut hit: Vector3, mut N: Vector3, mut material: Material) -> Option<(Vector3, Vector3, Material)>{
+  let mut closest_object = f32::MAX;
+  let mut hit_mark = None;
   for i in 0..spheres.len() {
     let mut dist_i: f32 = 0.0;
-    if let Some((dist_i)) = ray_intersect(spheres[i], origin, direction, dist_i){
-      if dist_i < spheres_distance {
-        spheres_distance = dist_i;
+    if let Some((dist_i)) = sphere_intersect(spheres[i], origin, direction, dist_i){
+      if dist_i < closest_object {
+        closest_object = dist_i;
         hit = origin + direction*dist_i;
         N = (hit-spheres[i].transform).normalize();
         material = spheres[i].material;
+        hit_mark = Some((hit, N, material));
       }
     }
   }
-  if (spheres_distance < 1000.0){
+  for mesh in meshes {
+    for face in &mesh.faces {
+      let v0 = mesh.verts[(face.x as usize)];
+      let v1 = mesh.verts[(face.y as usize)];
+      let v2 = mesh.verts[(face.z as usize)];
+      if let Some((t, normal)) = triangle_intersect(origin, direction, v0, v1, v2, mesh.transform) {
+        if t < closest_object {
+          closest_object = t;
+          hit = origin + direction * t;
+          N = normal;
+          material = mesh.material;
+          hit_mark = Some((hit, N, material));
+        }
+      }
+    }
+  }
+  if (closest_object < 1000.0){
     return Some((hit, N, material));
   }
   return None;
@@ -143,7 +201,7 @@ fn framebuffer_to_ppm(framebuffer: &mut Vec<Vector3>) -> io::Result<()>{
 }
 
 //Raycast function, uses reflection, refraction, and calculates shadows.
-fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>, depth: i32) -> Vector3{
+fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, depth: i32) -> Vector3{
   let mut N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
@@ -152,7 +210,7 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
 
   //Check if we've exceeded the path depth to limit render times.
   if (depth <= PATH_DEPTH){
-    if let Some((point, N, material)) = scene_intersect(origin, direction, &spheres, point, N, material) {
+    if let Some((point, N, material)) = scene_intersect(origin, direction, &spheres, &meshes, point, N, material) {
       let mut reflect_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       let mut refract_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       for i in 0..lights.len(){
@@ -177,8 +235,8 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
           refract_origin = point + (N * 0.001);
         }
 
-        reflect_color = cast_ray(reflect_origin, reflect_direction, spheres, lights, depth + 1);
-        refract_color = cast_ray(refract_origin, refract_direction, spheres, lights, depth + 1);
+        reflect_color = cast_ray(reflect_origin, reflect_direction, spheres, lights, meshes, depth + 1);
+        refract_color = cast_ray(refract_origin, refract_direction, spheres, lights, meshes, depth + 1);
         //Checking for shadows here.
         let mut shadow_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
         if (light_direction.dot(&N) < 0.0){
@@ -190,7 +248,7 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
         let shadow_pt: Vector3 = Vector3::new(0.0, 0.0, 0.0);
         let shadow_N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
         let temp_material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
-        if let Some((shadow_pt, shadow_N, temp_material)) = scene_intersect(shadow_origin, light_direction, &spheres, shadow_pt, shadow_N, temp_material){
+        if let Some((shadow_pt, shadow_N, temp_material)) = scene_intersect(shadow_origin, light_direction, &spheres, &meshes, shadow_pt, shadow_N, temp_material){
           if ((shadow_pt-shadow_origin).magnitude() < light_distance){
             continue;
           }
@@ -207,7 +265,7 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
 }
 
 //Our main rendering function that takes in our objects and lights.
-fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
+fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>){
   let mut threads = 1 as usize;
   //Check how many threads we have access to.
   match thread::available_parallelism() {
@@ -230,6 +288,8 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
 
   let spheres_arc = Arc::new(spheres.clone());
   let lights_arc = Arc::new(lights.clone());
+  let meshes_arc = Arc::new(meshes.clone());
+
 
   //Create a chunk of the render for each thread to compute.
   for j in 0..threads{
@@ -238,18 +298,27 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
     let tx = tx.clone();
     let spheres_clone = Arc::clone(&spheres_arc);
     let lights_clone = Arc::clone(&lights_arc);
+    let meshes_clone = Arc::clone(&meshes_arc);
 
     let handle = thread::spawn(move || {
     //Iterate through each pixel in the chunk and render it via ray-tracing.
     for y in start_y..end_y{
       for x in 0..WIDTH{
         let mut color = Vector3::new(0.0, 0.0, 0.0);
-        //Caat four rays for anti-aliasing.
-        for i in 0..FOURX_AA.len(){
-          let transform_x = (2.0*(x as f32 + 0.5 + FOURX_AA[i].x)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
-          let transform_y = -1.0*(2.0*(y as f32 + 0.5 + FOURX_AA[i].y)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
+        //Cast four rays for anti-aliasing.
+        if ANTI_ALIAS{
+          for i in 0..FOURX_AA.len(){
+            let transform_x = (2.0*(x as f32 + 0.5 + FOURX_AA[i].x)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
+            let transform_y = -1.0*(2.0*(y as f32 + 0.5 + FOURX_AA[i].y)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
+            let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
+            color = color + (cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, &*meshes_clone, 0)) * (1.0/(FOURX_AA.len() as f32));
+          }
+        }
+        else{
+          let transform_x = (2.0*(x as f32 + 0.5)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
+          let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
           let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
-          color = color + (cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, 0)) * (1.0/(FOURX_AA.len() as f32));
+          color = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, &*meshes_clone, 0);
         }
         //Send pixel back to main thread for assembly.
         tx.send((color, x+y*WIDTH)).unwrap();
@@ -282,13 +351,12 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>){
 }
 
 fn main(){
-  let temp = Model::new("res/monkey.obj");
-  println!("{:?}", temp.faces);
-  println!("{:?}", temp.verts);
-  /*
+
   //Initialize some materials, lights, and objects.
   let shiny = Material::new(Vector3::new(0.4, 0.3, 0.4), Vector4::new(0.6, 0.3, 0.1, 0.0), 60.0, 1.0);
-  let dull = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
+  let green = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
+  let red = Material::new(Vector3::new(0.3, 0.1, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
+  let yellow = Material::new(Vector3::new(0.3, 0.3, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
   let mirror = Material::new(Vector3::new(1.0, 1.0, 1.0), Vector4::new(0.0, 10.0, 0.8, 0.0), 1400.0, 1.0);
   let glass = Material::new(Vector3::new(0.6, 0.7, 0.8), Vector4::new(0.0,  0.5, 0.1, 0.8), 125.0, 1.5);
 
@@ -298,13 +366,19 @@ fn main(){
   lights.push(Light::new(Vector3::new(30.0, 20.0, 30.0), 1.7));
 
   let mut spheres: Vec<Sphere> = Vec::new();
-  spheres.push(Sphere::new(Vector3::new(-3.0, 0.0, -16.0), 3.0, shiny));
-  spheres.push(Sphere::new(Vector3::new(-1.0, -1.5, -12.0), 1.0, glass));
-  spheres.push(Sphere::new(Vector3::new(0.5, -0.5, -20.0), 2.0, dull));
-  spheres.push(Sphere::new(Vector3::new(7.0, 5.0, -18.0), 4.0, mirror));
+  spheres.push(Sphere::new(Vector3::new(-2.0, 0.0, -16.0), 3.0, shiny));
+  spheres.push(Sphere::new(Vector3::new(0.5, -1.5, -12.0), 1.0, glass));
+  spheres.push(Sphere::new(Vector3::new(-4.0, 4.5, -20.0), 2.0, red));
+  spheres.push(Sphere::new(Vector3::new(-10.5, 10.5, -25.0), 3.4, yellow));
+  spheres.push(Sphere::new(Vector3::new(-7.0, -1.0, -18.0), 4.0, mirror));
+  spheres.push(Sphere::new(Vector3::new(3.0, 15.0, -50.0), 6.0, mirror));
+
   
+  let mut meshes: Vec<Model> = Vec::new();
+  meshes.push(Model::new("res/plane.obj", Vector3::new(0.0, -4.0, 0.0), green));
+  meshes.push(Model::new("res/house.obj", Vector3::new(10.0, -4.0, -35.0), shiny));
+
   //Begin the render!
   println!("Welcome to Rustracer, beginning your render...");
-  render(&spheres, &lights);
-  */
+  render(&spheres, &lights, &meshes);
 }

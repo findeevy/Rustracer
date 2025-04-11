@@ -11,6 +11,8 @@ use std::str::SplitWhitespace;
 pub struct Model{
   pub verts: Vec<Vector3>,
   pub faces: Vec<Vector3i>,
+  pub transform: Vector3,
+  pub material: Material,
 }
 
 impl Model{
@@ -22,59 +24,38 @@ impl Model{
       Ok(file) => BufReader::new(file),
       Err(err) => {
         eprintln!("Failed to open {}: {}", filename, err);
-        return Model { verts, faces };
+        return Model {verts, faces, transform, material};
       }
     };
+    let mut reader = BufReader::new(file);
 
-    for line_result in file.lines(){
-      if let Ok(line) = line_result {
-        let mut parts = line.split_whitespace();
-        if let Some(prefix) = parts.next(){
-          match prefix {
-            //Vertices.
-            "v" => {
-              let mut v = Vector3::new(0.0, 0.0, 0.0);
-              for i in 0..3{
-                if let Some(val) = parts.next(){
-                  if let Ok(f) = val.parse::<f32>() {
-                    match i {
-                      0 => v.x = f,
-                      1 => v.y = f,
-                      2 => v.z = f,
-                      _ => {}
-                    }
-                  }
-                }
+  for line in reader.lines() {
+      let line = line.unwrap();
+      let parts: Vec<&str> = line.trim().split_whitespace().collect();
+      if parts.is_empty() { continue; }
+
+      match parts[0] {
+          "v" => {
+              let x: f32 = parts[1].parse().unwrap();
+              let y: f32 = parts[2].parse().unwrap();
+              let z: f32 = parts[3].parse().unwrap();
+              verts.push(Vector3::new(x, y, z));
+          },
+          "f" => {
+              let mut indices = Vec::new();
+              for part in &parts[1..] {
+                  let index_part = part.split('/').next().unwrap();
+                  let index = index_part.parse::<i32>().unwrap() - 1;
+                  indices.push(index);
               }
-              verts.push(v);
-            }  
-             //Faces.
-            "f" => {
-              let mut f = Vector3i::new(0, 0, 0);
-              if let Some(val) = parts.next(){
-                let temp = val.split("/").collect::<Vec<_>>();
-                let mut i = 0;
-                for part in temp{
-                  if let Ok(v) = part.parse::<i32>() {
-                    match i {
-                        0 => f.x = v,
-                        1 => f.y = v,
-                        2 => f.z = v,
-                        _ => {}
-                    }
+              if indices.len() >= 3 {
+                  for i in 2..indices.len() {
+                      faces.push(Vector3i::new(indices[0], indices[i-1], indices[i]));
                   }
-                  i += 1;
-                }
               }
-              faces.push(f);
-            }
-            //Other data.
-            _ => {
-              //Do nothing.
-            }
-          }
-        } 
-      }    
+          },
+          _ => {}
+      }
     }
     return Model {verts, faces, transform, material};
   }
