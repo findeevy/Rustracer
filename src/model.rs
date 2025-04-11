@@ -1,5 +1,6 @@
 use definitions::Vector3;
 use definitions::Vector3i;
+use definitions::Material;
 
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Error};
@@ -13,7 +14,7 @@ pub struct Model{
 }
 
 impl Model{
-  pub fn new(filename: &str) -> Self {
+  pub fn new(filename: &str, transform: Vector3, material: Material) -> Self {
     let mut verts: Vec<Vector3> = Vec::new();
     let mut faces: Vec<Vector3i> = Vec::new();
     let path = Path::new(filename);
@@ -65,7 +66,6 @@ impl Model{
                   i += 1;
                 }
               }
-              println!("{:?}", f);
               faces.push(f);
             }
             //Other data.
@@ -76,16 +76,8 @@ impl Model{
         } 
       }    
     }
-  return Model {verts, faces};
+    return Model {verts, faces, transform, material};
   }
 
-  pub fn triangle_intersect(fi: &i32, origin: &Vector3, direction: &Vector3, tnear: &f32) -> bool {
-    //let edge1: Vector3 =
-    return false;
-  }
-
-  /*pub fn vert(fi: i32, li: i32) -> i32{
-      
-  }*/
 }
  

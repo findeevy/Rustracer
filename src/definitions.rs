@@ -95,6 +95,16 @@ impl Vector3{
     self.x * other.x + self.y * other.y + self.z * other.z
   }
 
+  //Compute the cross product.
+  pub fn cross(&self, other: &Vector3) -> f32{
+    Vector3 {
+      x: self.y * other.z - self.z * other.y,
+      y: self.z * other.x - self.x * other.z,
+      z: self.x * other.y - self.y * other.x,
+    }
+  }
+
+  //Add constant to all points in vector3.
   pub fn addf(self, other: f32) -> Vector3{
     Vector3{
       x: self.x + other,
