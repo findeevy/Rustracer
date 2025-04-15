@@ -50,14 +50,6 @@ pub struct Vector2{
   pub y: f32,
 }
 
-//Vector32functionality.
-impl Vector2{
-  //Initiate a new Vector2 of two floats.
-  pub fn new(x:f32, y:f32) -> Self {
-    Vector2 {x, y}
-  }
-}
-
 #[derive(Debug, Copy, Clone)]
 pub struct Vector3i{
   pub x: i32,
@@ -104,15 +96,7 @@ impl Vector3{
     }
   }
 
-  //Add constant to all points in vector3.
-  pub fn addf(self, other: f32) -> Vector3{
-    Vector3{
-      x: self.x + other,
-      y: self.y + other,
-      z: self.z + other,
-    }
-  }
-  
+
   //Computes the length of the vector.
   pub fn magnitude(&self) -> f32 {
     (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
@@ -121,7 +105,7 @@ impl Vector3{
   //Normalizes the vector.
   pub fn normalize(&self) -> Vector3 {
     let magnitude = self.magnitude();
-    if(magnitude == 0.0){
+    if magnitude == 0.0 {
       return Vector3 {x: 0.0, y: 0.0, z:0.0}
     }
 

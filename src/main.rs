@@ -1,4 +1,4 @@
-#![allow(warnings)]
+//#![allow(warnings)]
 
 mod definitions;
 mod model;
@@ -15,21 +15,19 @@ use definitions::Sphere;
 use definitions::Material;
 
 //Import all of the standard libraries we need.
-use std::ops::{Add, Sub, Mul};
 use std::fs::File;
-use std::io::{self, Write, BufRead, BufReader};
-use std::process;
+use std::io::{self, Write};
 use std::mem;
 use std::thread;
-use std::time::{SystemTime, Instant};
+use std::time::{Instant};
 use std::sync::{Arc};
 use std::sync::mpsc::sync_channel;
 
 //Constants
 const BACKGROUND_COLOR: Vector3 = Vector3{x: 0.3, y: 0.6, z: 0.9};
 const PATH_DEPTH: i32 = 3;
-const HEIGHT: usize = 720;
-const WIDTH: usize = 1280;
+const HEIGHT: usize = 300;
+const WIDTH: usize = 300;
 const FOURX_AA: [Vector2; 4] = [Vector2{x: 0.25, y: 0.25}, Vector2{x: -0.25, y: 0.25}, Vector2{x: 0.25, y: -0.25}, Vector2{x: -0.25, y:-0.25}];
 const ANTI_ALIAS: bool = true;
 
@@ -39,16 +37,16 @@ fn udiv(x: usize, y: usize) -> f32{
 }
 
 //Refraction (Using Snell's law).
-fn refract(I: Vector3, N: Vector3, refractive_index: f32) -> Vector3{
-  let mut cosi: f32 = -1.0*(f32::max(-1.0, f32::min(1.0, I.dot(&N))));
+fn refract(i: Vector3, normal: Vector3, refractive_index: f32) -> Vector3{
+  let mut cosi: f32 = -1.0*(f32::max(-1.0, f32::min(1.0, i.dot(&normal))));
   let mut etai: f32 = 1.0;
   let mut etat: f32 = refractive_index;
-  let mut n: Vector3 = N;
+  let mut n: Vector3 = normal;
 
   if cosi < 0.0{
     cosi = cosi*(-1.0);
     mem::swap(&mut etai, &mut etat);
-    n = N*(-1.0);
+    n = normal*(-1.0);
   }
 
   let eta: f32 = etai / etat;
@@ -57,30 +55,30 @@ fn refract(I: Vector3, N: Vector3, refractive_index: f32) -> Vector3{
   if k < 0.0{
     return Vector3::new(0.0, 0.0, 0.0);
   }
-  return I*eta + n*(eta*cosi-k.sqrt());
+  return i*eta + n*(eta*cosi-k.sqrt());
 }
 
 //Reflection
-fn reflect(I: Vector3, N: Vector3) -> Vector3{
-  return I - N*2.0*(I.dot(&N));
+fn reflect(i: Vector3, normal: Vector3) -> Vector3{
+  return i - normal*2.0*(i.dot(&normal));
 }
 
 //Checks if a ray hits a sphere.
-fn sphere_intersect(sphere: Sphere, origin: Vector3, direction: Vector3, mut distance: f32) -> Option<f32>{
+fn sphere_intersect(sphere: Sphere, origin: Vector3, direction: Vector3) -> Option<f32>{
   let length = sphere.transform - origin;
   let ray = length.dot(&direction);
   let difference_of_squares = (length.dot(&length)) - ray*ray;
-  if (difference_of_squares > sphere.radius*sphere.radius){
+  if difference_of_squares > sphere.radius*sphere.radius{
     return None;
   }
   let temp = (sphere.radius*sphere.radius - difference_of_squares).sqrt();
-  distance = ray - temp;
+  let mut distance = ray - temp;
   let point1 = ray + temp;
-  if (distance < 0.0){
+  if distance < 0.0{
     distance = point1;
   }
   if !(distance < 0.0){
-    return Some((distance));
+    return Some(distance);
   }
   else{
     return None;
@@ -97,7 +95,7 @@ fn triangle_intersect(origin: Vector3, direction: Vector3, v0: Vector3, v1: Vect
   let h = direction.cross(&edge2);
   let a = edge1.dot(&h);
 
-  if (a.abs() < 0.0001){ 
+  if a.abs() < 0.0001{ 
     return None; 
   }
 
@@ -112,12 +110,12 @@ fn triangle_intersect(origin: Vector3, direction: Vector3, v0: Vector3, v1: Vect
   let q = s.cross(&edge1);
   let v = f * direction.dot(&q);
 
-  if (v < 0.0 || u + v > 1.0){ 
+  if v < 0.0 || u + v > 1.0{ 
     return None; 
   }
 
   let t = f * edge2.dot(&q);
-  if (t > 0.0001){
+  if t > 0.0001{
     let normal = edge1.cross(&edge2).normalize();
     return Some((t, normal));
   } 
@@ -127,39 +125,35 @@ fn triangle_intersect(origin: Vector3, direction: Vector3, v0: Vector3, v1: Vect
 }
 
 //Runs through list of objects in the scene and checks for intersection.
-fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, meshes: &Vec<Model>, mut hit: Vector3, mut N: Vector3, mut material: Material) -> Option<(Vector3, Vector3, Material)>{
+fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, meshes: &Vec<Model>, mut hit: Vector3, mut n: Vector3, mut material: Material) -> Option<(Vector3, Vector3, Material)>{
   let mut closest_object = f32::MAX;
-  let mut hit_mark = None;
   for i in 0..spheres.len() {
-    let mut dist_i: f32 = 0.0;
-    if let Some((dist_i)) = sphere_intersect(spheres[i], origin, direction, dist_i){
+    if let Some(dist_i) = sphere_intersect(spheres[i], origin, direction){
       if dist_i < closest_object {
         closest_object = dist_i;
         hit = origin + direction*dist_i;
-        N = (hit-spheres[i].transform).normalize();
+        n = (hit-spheres[i].transform).normalize();
         material = spheres[i].material;
-        hit_mark = Some((hit, N, material));
       }
     }
   }
   for mesh in meshes {
     for face in &mesh.faces {
-      let v0 = mesh.verts[(face.x as usize)];
-      let v1 = mesh.verts[(face.y as usize)];
-      let v2 = mesh.verts[(face.z as usize)];
+      let v0 = mesh.verts[face.x as usize];
+      let v1 = mesh.verts[face.y as usize];
+      let v2 = mesh.verts[face.z as usize];
       if let Some((t, normal)) = triangle_intersect(origin, direction, v0, v1, v2, mesh.transform) {
         if t < closest_object {
           closest_object = t;
           hit = origin + direction * t;
-          N = normal;
+          n = normal;
           material = mesh.material;
-          hit_mark = Some((hit, N, material));
         }
       }
     }
   }
-  if (closest_object < 1000.0){
-    return Some((hit, N, material));
+  if closest_object < 1000.0{
+    return Some((hit, n, material));
   }
   return None;
 }
@@ -202,59 +196,52 @@ fn framebuffer_to_ppm(framebuffer: &mut Vec<Vector3>) -> io::Result<()>{
 
 //Raycast function, uses reflection, refraction, and calculates shadows.
 fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, depth: i32) -> Vector3{
-  let mut N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-  let mut point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-  let mut material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
+  let normal: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+  let point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+  let material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
   let mut diffuse_light_intensity: f32 = 0.0;
   let mut specular_light_intensity: f32 = 0.0;
 
   //Check if we've exceeded the path depth to limit render times.
-  if (depth <= PATH_DEPTH){
-    if let Some((point, N, material)) = scene_intersect(origin, direction, &spheres, &meshes, point, N, material) {
+  if depth <= PATH_DEPTH{
+    if let Some((point, normal, material)) = scene_intersect(origin, direction, &spheres, &meshes, point, normal, material) {
       let mut reflect_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       let mut refract_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       for i in 0..lights.len(){
         let light_direction: Vector3 = (lights[i].transform - point).normalize();
         let light_distance = (lights[i].transform - point).magnitude();
         //Checking for reflection and refraction.
-        let reflect_direction: Vector3 = reflect(direction, N).normalize();
-        let refract_direction: Vector3 = refract(direction, N, material.refractive_index).normalize();
-        let mut reflect_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-        let mut refract_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-        if (reflect_direction.dot(&N) < 0.0){
-          reflect_origin = point - (N * 0.001);
-        }
-        else{
-          reflect_origin = point + (N * 0.001);
+        let reflect_direction: Vector3 = reflect(direction, normal).normalize();
+        let refract_direction: Vector3 = refract(direction, normal, material.refractive_index).normalize();
+        let mut reflect_origin: Vector3 = point + (normal * 0.001);
+        let mut refract_origin: Vector3 = point + (normal * 0.001);
+        if reflect_direction.dot(&normal) < 0.0{
+          reflect_origin = point - (normal * 0.001);
         }
 
-        if (refract_direction.dot(&N) < 0.0){
-          refract_origin = point - (N * 0.001);
-        }
-        else{
-          refract_origin = point + (N * 0.001);
+        if refract_direction.dot(&normal) < 0.0{
+          refract_origin = point - (normal * 0.001);
         }
 
         reflect_color = cast_ray(reflect_origin, reflect_direction, spheres, lights, meshes, depth + 1);
         refract_color = cast_ray(refract_origin, refract_direction, spheres, lights, meshes, depth + 1);
         //Checking for shadows here.
-        let mut shadow_origin: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-        if (light_direction.dot(&N) < 0.0){
-          shadow_origin = point - (N * 0.001);
+        let mut shadow_origin = point + (normal * 0.001);
+  
+        if light_direction.dot(&normal) < 0.0{
+          shadow_origin = point - (normal * 0.001);
         }
-        else{
-          shadow_origin = point + (N * 0.001);
-        }
+
         let shadow_pt: Vector3 = Vector3::new(0.0, 0.0, 0.0);
-        let shadow_N: Vector3 = Vector3::new(0.0, 0.0, 0.0);
+        let shadow_n: Vector3 = Vector3::new(0.0, 0.0, 0.0);
         let temp_material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
-        if let Some((shadow_pt, shadow_N, temp_material)) = scene_intersect(shadow_origin, light_direction, &spheres, &meshes, shadow_pt, shadow_N, temp_material){
-          if ((shadow_pt-shadow_origin).magnitude() < light_distance){
+        if let Some((shadow_pt, _, _)) = scene_intersect(shadow_origin, light_direction, &spheres, &meshes, shadow_pt, shadow_n, temp_material){
+          if (shadow_pt-shadow_origin).magnitude() < light_distance{
             continue;
           }
         }
-        diffuse_light_intensity += lights[i].intensity * light_direction.dot(&N).max(0.0);
-        specular_light_intensity += (f32::max(0.0, (reflect(light_direction * -1.0, N) * -1.0).dot(&direction))).powf(material.specular_exponent) * lights[i].intensity;
+        diffuse_light_intensity += lights[i].intensity * light_direction.dot(&normal).max(0.0);
+        specular_light_intensity += (f32::max(0.0, (reflect(light_direction * -1.0, normal) * -1.0).dot(&direction))).powf(material.specular_exponent) * lights[i].intensity;
       }
       //Compute the final color of the pixel.
       return (material.diffuse_color * diffuse_light_intensity * material.albedo.x) + ((Vector3::new(1.0, 1.0, 1.0)) * specular_light_intensity * material.albedo.y) + reflect_color*material.albedo.z + refract_color*material.albedo.a;
