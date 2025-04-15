@@ -3,9 +3,8 @@ use definitions::Vector3i;
 use definitions::Material;
 
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Error};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::str::SplitWhitespace;
 
 #[derive(Debug, Clone)]
 pub struct Model{
@@ -27,7 +26,7 @@ impl Model{
         return Model {verts, faces, transform, material};
       }
     };
-    let mut reader = BufReader::new(file);
+    let reader = BufReader::new(file);
 
   for line in reader.lines() {
       let line = line.unwrap();
