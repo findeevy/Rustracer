@@ -11,9 +11,6 @@ A custom software raytraced 3D renderer that uses no external libraries or frame
 -OBJ input.\
 -Fast low-level performance.
 
-## Sample Output:
-![A raytraced render from Rustracer.](out.png "Render")
-
 ## Compilation:
 Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main.rs -o rustracer" for Linux or "rustc main.rs -o rustracer.exe" on Windows.
 
@@ -26,4 +23,6 @@ res/ <- This is where the models are stored.\
 compile.sh <- This is a Linux shell script you may run to compile the project.\
 out.ppm <- Will be the output of the renderer, easily viewable in [GIMP](https://www.gimp.org/downloads/).
 
+## Sample Output:
+![A raytraced render from Rustracer.](out.png "Render")
 
