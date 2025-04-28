@@ -24,5 +24,5 @@ compile.sh <- This is a Linux shell script you may run to compile the project.\
 out.ppm <- Will be the output of the renderer, easily viewable in [GIMP](https://www.gimp.org/downloads/).
 
 ## Sample Output:
-![A raytraced render from Rustracer.](out.png "Render")
-
+![A raytraced scene from Rustracer.](out.png "Render")\
+![A raytraced teapot from Rustracer.](tea.png "Render")
