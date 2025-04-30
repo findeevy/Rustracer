@@ -25,4 +25,5 @@ out.ppm <- Will be the output of the renderer, easily viewable in [GIMP](https:/
 
 ## Sample Output:
 ![A raytraced scene from Rustracer.](out.png "Render")\
+![A raytraced monkey from Rustracer.](monkey.png "Render")\
 ![A raytraced teapot from Rustracer.](tea.png "Render")

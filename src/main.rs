@@ -24,10 +24,10 @@ use std::sync::{Arc};
 use std::sync::mpsc::sync_channel;
 
 //Constants
-const BACKGROUND_COLOR: Vector3 = Vector3{x: 0.3, y: 0.6, z: 0.9};
-const PATH_DEPTH: i32 = 3;
-const HEIGHT: usize = 300;
-const WIDTH: usize = 300;
+const BACKGROUND_COLOR: Vector3 = Vector3{x: 1.0, y: 1.0, z: 1.0};
+const PATH_DEPTH: i32 = 5;
+const HEIGHT: usize = 1280;
+const WIDTH: usize = 720;
 const FOURX_AA: [Vector2; 4] = [Vector2{x: 0.25, y: 0.25}, Vector2{x: -0.25, y: 0.25}, Vector2{x: 0.25, y: -0.25}, Vector2{x: -0.25, y:-0.25}];
 const ANTI_ALIAS: bool = true;
 
@@ -353,17 +353,12 @@ fn main(){
   lights.push(Light::new(Vector3::new(30.0, 20.0, 30.0), 1.7));
 
   let mut spheres: Vec<Sphere> = Vec::new();
-  spheres.push(Sphere::new(Vector3::new(-2.0, 0.0, -16.0), 3.0, shiny));
-  spheres.push(Sphere::new(Vector3::new(0.5, -1.5, -12.0), 1.0, glass));
-  spheres.push(Sphere::new(Vector3::new(-4.0, 4.5, -20.0), 2.0, red));
-  spheres.push(Sphere::new(Vector3::new(-10.5, 10.5, -25.0), 3.4, yellow));
-  spheres.push(Sphere::new(Vector3::new(-7.0, -1.0, -18.0), 4.0, mirror));
-  spheres.push(Sphere::new(Vector3::new(3.0, 15.0, -50.0), 6.0, mirror));
+  spheres.push(Sphere::new(Vector3::new(3.0, 10.0, -25.0), 6.0, mirror));
 
   
   let mut meshes: Vec<Model> = Vec::new();
-  meshes.push(Model::new("res/plane.obj", Vector3::new(0.0, -4.0, 0.0), green));
-  meshes.push(Model::new("res/house.obj", Vector3::new(10.0, -4.0, -35.0), shiny));
+  meshes.push(Model::new("res/plane.obj", Vector3::new(0.0, -4.0, 0.0), mirror));
+  meshes.push(Model::new("res/monkey.obj", Vector3::new(0.0, -0.5, -15.0), red));
 
   //Begin the render!
   println!("Welcome to Rustracer, beginning your render...");
