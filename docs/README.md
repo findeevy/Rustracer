@@ -1,5 +1,6 @@
 # Rustracer
-A custom software raytraced 3D renderer that uses no external libraries or frameworks for its rendering model. I'm writing it to better understand graphics programming, low-level systems, and Rust.
+A custom software raytraced 3D renderer that uses no external libraries or frameworks for its rendering model. I'm writing it to better understand graphics programming, low-level systems, and Rust.\
+![A sequence diagram of Rustracer.](sequence_diagram.png "Sequence Diagram")
 
 ## Compilation:
 Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main.rs -o rustracer" for Linux or "rustc main.rs -o rustracer.exe" on Windows.
@@ -21,7 +22,6 @@ Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main
 -Fast low-level performance.
 
 ## Project Structure:
-![A sequence diagram of Rustracer.](sequence_diagram.png "Sequence Diagram")\
 src/main.rs <- This is what runs the raytracing calculations and rendering.\
 src/model.rs <- This parses and sets up our 3D models that we've fed in as OBJ files.\
 src/definitions.rs <- This defines the data and geometry that is used for rendering (Vector3, Lights, Materials, etc).\
