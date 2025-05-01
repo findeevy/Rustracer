@@ -30,8 +30,7 @@ res/ <- This is where the models are stored.\
 scripts/ <- This is where example scripts for the raytracer to run are stored.\
 compile.sh <- This is a Linux shell script you may run to compile the project.\
 out.ppm <- Will be the output of the renderer, easily viewable in [GIMP](https://www.gimp.org/downloads/).\
-![A sequence diagram of Rustracer.](sequence_diagram.png "Sequence Diagram")
-
+![A sequence diagram of Rustracer.](sequence_diagram.png "Sequence Diagram")\
 
 ## RT Script:
-Check out the example scripts as the exhaust the full syntax of this language, make sure to define the materials before you define meshes or spheres.
+Check out the example scripts as they exhaust the full syntax of this language, make sure to define the materials before you define meshes or spheres.
