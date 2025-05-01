@@ -4,6 +4,11 @@ A custom software raytraced 3D renderer that uses no external libraries or frame
 ## Compilation:
 Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main.rs -o rustracer" for Linux or "rustc main.rs -o rustracer.exe" on Windows.
 
+## Sample Output:
+![A raytraced scene from Rustracer.](out.png "Render")\
+![A raytraced monkey from Rustracer.](monkey.png "Render")\
+![A raytraced teapot from Rustracer.](tea.png "Render")
+
 ## Features:
 -Raytraced reflections, refraction, and shadows.\
 -Multithreading support.\
@@ -26,7 +31,6 @@ compile.sh <- This is a Linux shell script you may run to compile the project.\
 out.ppm <- Will be the output of the renderer, easily viewable in [GIMP](https://www.gimp.org/downloads/).\
 ![A sequence diagram of Rustracer.](sequence_diagram.png "Sequence Diagram")
 
-## Sample Output:
-![A raytraced scene from Rustracer.](out.png "Render")\
-![A raytraced monkey from Rustracer.](monkey.png "Render")\
-![A raytraced teapot from Rustracer.](tea.png "Render")
+
+## RT Script:
+Check out the example scripts as the exhaust the full syntax of this language, make sure to define the materials before you define meshes or spheres.
