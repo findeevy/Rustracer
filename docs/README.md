@@ -22,6 +22,7 @@ Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main
 
 ## Project Structure:
 src/main.rs <- This is what runs the raytracing calculations and rendering.\
+src/intepreter.rs <- This interprets the input script and turns it into understandable instructions for the renderer.\
 src/model.rs <- This parses and sets up our 3D models that we've fed in as OBJ files.\
 src/definitions.rs <- This defines the data and geometry that is used for rendering (Vector3, Lights, Materials, etc).\
 docs/ <- This is where the documentation is stored.\
