@@ -1,0 +1,33 @@
+#dimensions of render
+h 400
+w 400
+
+#path depth
+r 3
+
+#anti-aliasing 0 = false 1 = true
+aa 1
+
+#background color r g b
+bg 0.4 0.4 1.0
+
+#materials x y z, diffuse, specular, reflect, refract, opacity
+mt red 0.7 0.1 0.1 0.9 0.1 0.0 0.0 10.0 1.0
+mt blue 0.1 0.1 0.7 0.9 0.1 0.0 0.0 10.0 1.0
+mt yellow 0.7 0.7 0.1 0.9 0.1 0.0 0.0 10.0 1.0
+mt green 0.1 0.7 0.1 0.9 0.1 0.0 0.0 10.0 1.0
+mt mirror 1.0 1.0 1.0 0.0 10.0 0.8 0.0 1400.0 1.0
+
+#lights x y z intensity
+l -20.0 20.0 20.0 1.5
+l 30.0 50.0 -25.0 1.8
+l 30.0 20.0 30.0 1.7
+
+#spheres x y z radius material
+sp 7.0 20.0 -45.0 10.0 mirror
+sp -2.0 5.0 -25.0 2.5 red
+sp -5.0 1.0 -15.0 2.3 blue
+sp 3.0 2.0 -10.0 2.0 yellow
+
+#meshes file x y z material
+ms res/plane.obj 0.0 -4.0 0.0 green
