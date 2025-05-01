@@ -1,0 +1,28 @@
+#dimensions
+h 100
+w 100
+
+#amount
+r 2
+
+#anti-aliasing 0 = false 1 = true
+aa 0
+
+#background color r g b
+bg 1.0 1.0 1.0
+
+#materials
+mt red 0.3 0.1 0.1 0.9 0.1 0.0 0.0 10.0 1.0
+mt mirror 1.0 1.0 1.0 0.0 10.0 0.8 0.0 1400.0 1.0
+
+#lights
+l -20.0 20.0 20.0 1.5
+l 30.0 50.0 -25.0 1.8
+l 30.0 20.0 30.0 1.7
+
+#spheres
+sp 7.0 16.0 -45.0 10.0 mirror
+
+#meshes
+ms res/plane.obj 0.0 -4.0 0.0 mirror
+ms res/house.obj -8.0 -3.5 -35.0 red
