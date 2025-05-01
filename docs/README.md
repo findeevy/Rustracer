@@ -12,6 +12,7 @@ Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main
 ## Features:
 -Raytraced reflections, refraction, and shadows.\
 -Multithreading support.\
+-Custom script interpreter.\
 -Diffuse lighting.\
 -Specular illumination.\
 -Anti-Aliasing\
