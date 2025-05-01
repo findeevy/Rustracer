@@ -1,6 +1,14 @@
 # Rustracer
 A custom software raytraced 3D renderer that uses no external libraries or frameworks for its rendering model. I'm writing it to better understand graphics programming, low-level systems, and Rust.
 
+## Compilation:
+Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main.rs -o rustracer" for Linux or "rustc main.rs -o rustracer.exe" on Windows.
+
+## Sample Output:
+![A raytraced scene from Rustracer.](out.png "Render")\
+![A raytraced monkey from Rustracer.](monkey.png "Render")\
+![A raytraced teapot from Rustracer.](tea.png "Render")
+
 ## Features:
 -Raytraced reflections, refraction, and shadows.\
 -Multithreading support.\
@@ -10,14 +18,6 @@ A custom software raytraced 3D renderer that uses no external libraries or frame
 -PPM output.\
 -OBJ input.\
 -Fast low-level performance.
-
-## Sample Output:
-![A raytraced scene from Rustracer.](out.png "Render")\
-![A raytraced monkey from Rustracer.](monkey.png "Render")\
-![A raytraced teapot from Rustracer.](tea.png "Render")
-
-## Compilation:
-Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main.rs -o rustracer" for Linux or "rustc main.rs -o rustracer.exe" on Windows.
 
 ## Project Structure:
 src/main.rs <- This is what runs the raytracing calculations and rendering.\
