@@ -377,7 +377,7 @@ fn main(){
   println!("Welcome to Rustracer!");
   //Read in the user's script.
   let mut input = String::new();
-  println!("Please enter the local path to your script file (example at 'scripts/house.rustracer'):");
+  println!("Please enter the local path to your script file (example at 'scripts/house.rt'):");
   io::stdout().flush().unwrap();
   io::stdin().read_line(&mut input).expect("Failed to read your input.");
   let input = input.trim().to_string();
