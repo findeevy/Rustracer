@@ -21,15 +21,14 @@ use std::mem;
 use std::thread;
 use std::time::{Instant};
 use std::sync::{Arc};
+use std::collections::HashMap;
+use std::path::Path;
 use std::sync::mpsc::sync_channel;
+use std::io::BufRead;
 
-//Constants
-const BACKGROUND_COLOR: Vector3 = Vector3{x: 1.0, y: 1.0, z: 1.0};
-const PATH_DEPTH: i32 = 5;
-const HEIGHT: usize = 1280;
-const WIDTH: usize = 720;
+//Constant Variables
 const FOURX_AA: [Vector2; 4] = [Vector2{x: 0.25, y: 0.25}, Vector2{x: -0.25, y: 0.25}, Vector2{x: 0.25, y: -0.25}, Vector2{x: -0.25, y:-0.25}];
-const ANTI_ALIAS: bool = true;
+
 
 //Divide two usizes and return a float.
 fn udiv(x: usize, y: usize) -> f32{
@@ -159,34 +158,34 @@ fn scene_intersect<'a>(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere
 }
 
 //Write the framebuffer to a ppm file.
-fn framebuffer_to_ppm(framebuffer: &mut Vec<Vector3>) -> io::Result<()>{
+fn framebuffer_to_ppm(framebuffer: &mut Vec<Vector3>, fheight: usize, fwidth: usize) -> io::Result<()>{
     //Open the PPM file.
     let mut file = File::create("./out.ppm")?;
     let start_time = Instant::now();
     //Write the header for the PPM file (P6 format, width, height, max color value).
     writeln!(file, "P6")?;
-    writeln!(file, "{} {}", WIDTH, HEIGHT)?;
+    writeln!(file, "{} {}", fwidth, fheight)?;
     writeln!(file, "255")?;
 
     //Write the pixel data.
-    for y in 0..HEIGHT {
-        for x in 0..WIDTH {
+    for y in 0..fheight {
+        for x in 0..fwidth {
             //Scale between 0 to 255 and convert to u8.
-            let mut c = framebuffer[x+y*WIDTH];
+            let mut c = framebuffer[x+y*fwidth];
             let max = f32::max(c.x, f32::max(c.y, c.z)); 
         
             if max > 1.0 {
                 let scale_factor = 1.0 / max;
                 c = c * scale_factor;
             } 
-            framebuffer[x+y*WIDTH] = c;
+            framebuffer[x+y*fwidth] = c;
 
-            let pixel_value = Vector3::new(framebuffer[x+y*WIDTH].x, framebuffer[x+y*WIDTH].y, framebuffer[x+y*WIDTH].z);
+            let pixel_value = Vector3::new(framebuffer[x+y*fwidth].x, framebuffer[x+y*fwidth].y, framebuffer[x+y*fwidth].z);
             let clamped = Vector3::tou8(pixel_value * 255.0);
             for i in clamped{
               file.write_all(&[i])?;
             }
-            print!("\r{:?}% of the image written to disk.", (udiv(x+y*WIDTH, HEIGHT*WIDTH)*100.0 + 1.0) as i32);
+            print!("\r{:?}% of the image written to disk.", (udiv(x+y*fwidth, fheight*fwidth)*100.0 + 1.0) as i32);
         }
     }
     let duration = start_time.elapsed();
@@ -195,7 +194,7 @@ fn framebuffer_to_ppm(framebuffer: &mut Vec<Vector3>) -> io::Result<()>{
 }
 
 //Raycast function, uses reflection, refraction, and calculates shadows.
-fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, depth: i32) -> Vector3{
+fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, depth: i32, background_color: Vector3, path_depth: i32) -> Vector3{
   let normal: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let point: Vector3 = Vector3::new(0.0, 0.0, 0.0);
   let material: Material = Material::new(Vector3::new(0.0, 0.0, 0.0), Vector4::new(0.0, 0.0, 0.0, 0.0), 0.0, 0.0);
@@ -203,7 +202,7 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
   let mut specular_light_intensity: f32 = 0.0;
 
   //Check if we've exceeded the path depth to limit render times.
-  if depth <= PATH_DEPTH{
+  if depth <= path_depth{
     if let Some((point, normal, material)) = scene_intersect(origin, direction, &spheres, &meshes, point, normal, material) {
       let mut reflect_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
       let mut refract_color: Vector3 = Vector3::new(0.0, 0.0, 0.0);
@@ -223,8 +222,8 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
           refract_origin = point - (normal * 0.001);
         }
 
-        reflect_color = cast_ray(reflect_origin, reflect_direction, spheres, lights, meshes, depth + 1);
-        refract_color = cast_ray(refract_origin, refract_direction, spheres, lights, meshes, depth + 1);
+        reflect_color = cast_ray(reflect_origin, reflect_direction, spheres, lights, meshes, depth + 1, background_color, path_depth);
+        refract_color = cast_ray(refract_origin, refract_direction, spheres, lights, meshes, depth + 1, background_color, path_depth);
         //Checking for shadows here.
         let mut shadow_origin = point + (normal * 0.001);
   
@@ -248,11 +247,11 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
     }
   }
   //If nothing is hit, just return the background color of the render.
-  return BACKGROUND_COLOR;
+  return background_color;
 }
 
 //Our main rendering function that takes in our objects and lights.
-fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>){
+fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, background_color: Vector3, path_depth: i32, fheight: usize, fwidth: usize, anti_alias: i32){
   let mut threads = 1 as usize;
   //Check how many threads we have access to.
   match thread::available_parallelism() {
@@ -270,7 +269,7 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>){
   let mut handles = vec![];
   let (tx, rx) = sync_channel(threads);
 
-  let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); WIDTH * HEIGHT];
+  let mut framebuffer: Vec<Vector3> = vec![Vector3::new(0.0, 0.0, 0.0); fwidth * fheight];
   let fov: f32 = 1.0;
 
   let spheres_arc = Arc::new(spheres.clone());
@@ -280,8 +279,8 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>){
 
   //Create a chunk of the render for each thread to compute.
   for j in 0..threads{
-    let start_y = ((j as f32)*udiv(HEIGHT, threads)) as usize;
-    let end_y = ((j as f32 + 1.0)*udiv(HEIGHT, threads)) as usize;
+    let start_y = ((j as f32)*udiv(fheight, threads)) as usize;
+    let end_y = ((j as f32 + 1.0)*udiv(fheight, threads)) as usize;
     let tx = tx.clone();
     let spheres_clone = Arc::clone(&spheres_arc);
     let lights_clone = Arc::clone(&lights_arc);
@@ -290,25 +289,25 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>){
     let handle = thread::spawn(move || {
     //Iterate through each pixel in the chunk and render it via ray-tracing.
     for y in start_y..end_y{
-      for x in 0..WIDTH{
+      for x in 0..fwidth{
         let mut color = Vector3::new(0.0, 0.0, 0.0);
         //Cast four rays for anti-aliasing.
-        if ANTI_ALIAS{
+        if anti_alias == 1{
           for i in 0..FOURX_AA.len(){
-            let transform_x = (2.0*(x as f32 + 0.5 + FOURX_AA[i].x)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
-            let transform_y = -1.0*(2.0*(y as f32 + 0.5 + FOURX_AA[i].y)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
+            let transform_x = (2.0*(x as f32 + 0.5 + FOURX_AA[i].x)/(fwidth as f32) - 1.0)*(fov/2.0).tan()*udiv(fwidth, fheight);
+            let transform_y = -1.0*(2.0*(y as f32 + 0.5 + FOURX_AA[i].y)/(fheight as f32) - 1.0)*(fov/2.0).tan();
             let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
-            color = color + (cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, &*meshes_clone, 0)) * (1.0/(FOURX_AA.len() as f32));
+            color = color + (cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, &*meshes_clone, 0, background_color, path_depth)) * (1.0/(FOURX_AA.len() as f32));
           }
         }
         else{
-          let transform_x = (2.0*(x as f32 + 0.5)/(WIDTH as f32) - 1.0)*(fov/2.0).tan()*udiv(WIDTH, HEIGHT);
-          let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(HEIGHT as f32) - 1.0)*(fov/2.0).tan();
+          let transform_x = (2.0*(x as f32 + 0.5)/(fwidth as f32) - 1.0)*(fov/2.0).tan()*udiv(fwidth, fheight);
+          let transform_y = -1.0*(2.0*(y as f32 + 0.5)/(fheight as f32) - 1.0)*(fov/2.0).tan();
           let direction = Vector3::new(transform_x, transform_y, -1.0).normalize();
-          color = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, &*meshes_clone, 0);
+          color = cast_ray(Vector3::new(0.0, 0.0, 0.0), direction, &*spheres_clone, &*lights_clone, &*meshes_clone, 0, background_color, path_depth);
         }
         //Send pixel back to main thread for assembly.
-        tx.send((color, x+y*WIDTH)).unwrap();
+        tx.send((color, x+y*fwidth)).unwrap();
       }
     }
     });
@@ -323,7 +322,7 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>){
     count = count + 1;
     let (data, id) = msg;
     framebuffer[id] = data;
-    print!("\r{:?}% of the image rendered.", (((count as f32)/((HEIGHT*WIDTH) as f32))*100.0) as i32);
+    print!("\r{:?}% of the image rendered.", (((count as f32)/((fheight*fwidth) as f32))*100.0) as i32);
   }
   
   //Kill the threads once finished.
@@ -334,33 +333,57 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>){
   //Wrap everything up and send it to be output!
   let duration = start_time.elapsed();
   println!("\nRendering completed in {} seconds.", duration.as_secs_f64());
-  let _ = framebuffer_to_ppm(&mut framebuffer);
+  let _ = framebuffer_to_ppm(&mut framebuffer, fwidth, fheight);
+}
+
+fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+where P: AsRef<Path>, {
+    let file = File::open(filename)?;
+    Ok(io::BufReader::new(file).lines())
+}
+
+fn interpreter(input: String) -> (Vec<Light>, Vec<Sphere>, Vec<Model>, Vector3, i32, usize, usize, i32){
+  let mut materials: HashMap<String, Material> = HashMap::new();
+  let mut lights: Vec<Light> = Vec::new();
+  let mut spheres: Vec<Sphere> = Vec::new();
+  let mut meshes: Vec<Model> = Vec::new();
+  let mut background_color: Vector3 = Vector3{x: 1.0, y: 1.0, z: 1.0};
+  let mut path_depth: i32 = 5;
+  let mut fheight: usize = 1280;
+  let mut fwidth: usize = 720;
+  let mut anti_alias: i32 = 1;
+  if let Ok(lines) = read_lines(input) {
+    for line in lines.map_while(Result::ok) {
+      let line_split: Vec<&str> = line.split_whitespace().collect();
+      //This is super messy, I'll look into making it way cleaner soon...
+      match line.chars().take(2).collect::<String>().as_str() {
+        "h " => fheight = line_split[1].parse().unwrap(),
+        "w " => fwidth = line_split[1].parse().unwrap(),
+        "r " => path_depth = line_split[1].parse().unwrap(),
+        "aa" => anti_alias = line_split[1].parse().unwrap(),
+        "bg" => background_color = Vector3{x: line_split[1].parse().unwrap(), y: line_split[2].parse().unwrap(), z: line_split[3].parse().unwrap()},
+        "mt" => {materials.insert(line_split[1].to_string(), Material::new(Vector3::new(line_split[2].parse().unwrap(), line_split[3].parse().unwrap(), line_split[4].parse().unwrap()), Vector4::new(line_split[5].parse().unwrap(), line_split[6].parse().unwrap(), line_split[7].parse().unwrap(), line_split[8].parse().unwrap()), line_split[9].parse().unwrap(), line_split[10].parse().unwrap()));},
+        "l " => lights.push(Light::new(Vector3::new(line_split[1].parse().unwrap(), line_split[2].parse().unwrap(), line_split[3].parse().unwrap()), line_split[4].parse().unwrap())),
+        "sp" => spheres.push(Sphere::new(Vector3::new(line_split[1].parse().unwrap(), line_split[2].parse().unwrap(), line_split[3].parse().unwrap()), line_split[4].parse().unwrap(), materials[line_split[5]])),
+        "ms" => meshes.push(Model::new(line_split[1], Vector3::new(line_split[2].parse().unwrap(), line_split[3].parse().unwrap(), line_split[4].parse().unwrap()), materials[line_split[5]])),
+        _ => (),
+      }
+    }
+  }
+  return (lights, spheres, meshes, background_color, path_depth, fheight, fwidth, anti_alias);
 }
 
 fn main(){
-
-  //Initialize some materials, lights, and objects.
-  let shiny = Material::new(Vector3::new(0.4, 0.3, 0.4), Vector4::new(0.6, 0.3, 0.1, 0.0), 60.0, 1.0);
-  let green = Material::new(Vector3::new(0.1, 0.3, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
-  let red = Material::new(Vector3::new(0.3, 0.1, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
-  let yellow = Material::new(Vector3::new(0.3, 0.3, 0.1), Vector4::new(0.9, 0.1, 0.0, 0.0), 10.0, 1.0);
-  let mirror = Material::new(Vector3::new(1.0, 1.0, 1.0), Vector4::new(0.0, 10.0, 0.8, 0.0), 1400.0, 1.0);
-  let glass = Material::new(Vector3::new(0.6, 0.7, 0.8), Vector4::new(0.0,  0.5, 0.1, 0.8), 125.0, 1.5);
-
-  let mut lights: Vec<Light> = Vec::new();
-  lights.push(Light::new(Vector3::new(-20.0, 20.0, 20.0), 1.5));
-  lights.push(Light::new(Vector3::new(30.0, 50.0, -25.0), 1.8));
-  lights.push(Light::new(Vector3::new(30.0, 20.0, 30.0), 1.7));
-
-  let mut spheres: Vec<Sphere> = Vec::new();
-  spheres.push(Sphere::new(Vector3::new(3.0, 10.0, -25.0), 6.0, mirror));
-
-  
-  let mut meshes: Vec<Model> = Vec::new();
-  meshes.push(Model::new("res/plane.obj", Vector3::new(0.0, -4.0, 0.0), mirror));
-  meshes.push(Model::new("res/monkey.obj", Vector3::new(0.0, -0.5, -15.0), red));
-
+  println!("Welcome to Rustracer!");
+  //Read in the user's script.
+  let mut input = String::new();
+  println!("Please enter the local path to your script file (example at 'scripts/house.rustracer'):");
+  io::stdout().flush().unwrap();
+  io::stdin().read_line(&mut input).expect("Failed to read your input.");
+  let input = input.trim().to_string();
+  //Interpret the script into our render variables.
+  let (lights, spheres, meshes, background_color, path_depth, fheight, fwidth, anti_alias) = interpreter(input);
+  println!("Starting your render.");
   //Begin the render!
-  println!("Welcome to Rustracer, beginning your render...");
-  render(&spheres, &lights, &meshes);
+  render(&spheres, &lights, &meshes, background_color, path_depth, fheight, fwidth, anti_alias);
 }
