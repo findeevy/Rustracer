@@ -5,15 +5,15 @@ A custom software raytraced 3D renderer that uses no external libraries or frame
 Install [Rust](https://www.rust-lang.org/tools/install) and then run "rustc main.rs -o rustracer" for Linux or "rustc main.rs -o rustracer.exe" on Windows.
 
 ## Features:
--Raytraced reflections, refraction, and shadows.\
--Multithreading support.\
--Custom script interpreter.\
--Diffuse lighting.\
--Specular illumination.\
--Anti-Aliasing\
--PPM output.\
--OBJ input.\
--Fast low-level performance.
+- Raytraced reflections, refraction, and shadows.
+- Multithreading support.
+- Custom script interpreter.
+- Diffuse lighting.
+- Specular illumination.
+- Anti-Aliasing
+- PPM output.
+- OBJ input.
+- Fast low-level performance.
 
 ## Sample Output:
 ![A raytraced scene from Rustracer.](out.png "Render")\
