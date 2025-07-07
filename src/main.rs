@@ -1,5 +1,3 @@
-//#![allow(warnings)]
-
 mod definitions;
 mod interpreter;
 mod model;
@@ -252,13 +250,14 @@ fn cast_ray(origin: Vector3, direction: Vector3, spheres: &Vec<Sphere>, lights: 
 }
 
 //Our main rendering function that takes in our objects and lights.
-fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, background_color: Vector3, path_depth: i32, fheight: usize, fwidth: usize, anti_alias: i32){
-  let mut threads = 1 as usize;
+fn local_render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, background_color: Vector3, path_depth: i32, fheight: usize, fwidth: usize, anti_alias: i32){
+  
+  let mut local_threads = 1 as usize;
   //Check how many threads we have access to.
-  match thread::available_parallelism() {
+  match local_thread::available_parallelism() {
     Ok(parallelism) => {
-      threads = parallelism.into();
-      println!("{} threads available.", threads);
+      local_threads = parallelism.into();
+      println!("{} threads available.", local_threads);
     }
     Err(e) => {
       eprintln!("Failed to get available threads: {}", e);
@@ -277,11 +276,10 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, backg
   let lights_arc = Arc::new(lights.clone());
   let meshes_arc = Arc::new(meshes.clone());
 
-
   //Create a chunk of the render for each thread to compute.
-  for j in 0..threads{
-    let start_y = ((j as f32)*udiv(fheight, threads)) as usize;
-    let end_y = ((j as f32 + 1.0)*udiv(fheight, threads)) as usize;
+  for j in 0..local_threads{
+    let start_y = ((j as f32)*udiv(fheight, total_threads)) as usize;
+    let end_y = ((j as f32 + 1.0)*udiv(fheight, total_threads)) as usize;
     let tx = tx.clone();
     let spheres_clone = Arc::clone(&spheres_arc);
     let lights_clone = Arc::clone(&lights_arc);
@@ -323,7 +321,7 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, backg
     count = count + 1;
     let (data, id) = msg;
     framebuffer[id] = data;
-    print!("\r{:?}% of the image rendered.", (((count as f32)/((fheight*fwidth) as f32))*100.0) as i32);
+    print!("\r{:?}% of the image rendered locally.", (((count as f32)/((fheight*fwidth) as f32))*100.0) as i32);
   }
   
   //Kill the threads once finished.
@@ -337,17 +335,39 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>, meshes: &Vec<Model>, backg
   let _ = framebuffer_to_ppm(&mut framebuffer, fwidth, fheight);
 }
 
-fn main(){
-  println!("Welcome to Rustracer!");
-  //Read in the user's script.
+fn ask_input(display: String)->String{
+  println!(display);
   let mut input = String::new();
-  println!("Please enter the local path to your script file (example at 'scripts/house.rt'):");
   io::stdout().flush().unwrap();
   io::stdin().read_line(&mut input).expect("Failed to read your input.");
-  let input = input.trim().to_string();
-  //Interpret the script into our render variables.
-  let (lights, spheres, meshes, background_color, path_depth, fheight, fwidth, anti_alias) = interpreter(input);
-  println!("Starting your render.");
-  //Begin the render!
-  render(&spheres, &lights, &meshes, background_color, path_depth, fheight, fwidth, anti_alias);
+  return input.trim().to_string();
+}
+
+fn worker_render(){
+
+}
+
+fn main(){
+  println!("Welcome to Rustracer!");
+
+  let network_mode = ask_input("Do you want to run as a (w)orker node or (c)ontrol node?");
+  
+  if (network_mode == "w"){
+    worker_render();
+    break;
+  }
+
+  let script_path = ask_input("Please enter the local path to your script file (example at 'scripts/house.rt'):");
+  let (lights, spheres, meshes, background_color, path_depth, fheight, fwidth, anti_alias) = interpreter(script_path);
+  
+  let distribution_mode = ask_input("Would you like to run in (d)istributed mode or (l)ocal mode?");
+  
+  if (distribution_mode == "l"){
+    local_render(&spheres, &lights, &meshes, background_color, path_depth, fheight, fwidth, anti_alias);
+    break;
+  }
+  else{
+    control_render();
+    break;
+  }
 }
